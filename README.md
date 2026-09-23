@@ -35,6 +35,21 @@ The research has been presented at SABR conferences and is currently being prepa
 
 ---
 
+### Pioneer League Analytics Shiny Application
+**Baseball Analytics | Player Development | R Shiny**
+
+Developed an interactive R Shiny application to support analytics and player development for the Ogden Raptors of the Pioneer Baseball League. The application transformed pitch-level and game data into accessible analytical tools for coaches and baseball operations staff.
+
+The application was designed to bridge the gap between statistical analysis and on-field decision-making by allowing users to interact with player performance data, pitching metrics, and visualizations in a centralized platform.
+
+**Tools:** R, Shiny, tidyverse, ggplot2, Baseball Data Visualization
+
+> The application and underlying team data are not publicly available due to proprietary and organizational data restrictions.
+
+[View Project](./Pioneer-League-Shiny-App/)
+
+---
+
 ### Pitch Outcome Modeling
 **Predictive Analytics | Machine Learning**
 
