@@ -65,14 +65,15 @@ This project explores how traditional qualitative scouting information can be in
 
 ---
 
-### Pitch Outcome Modeling
-**Predictive Analytics | Machine Learning**
+Pitch Strike Probability Modeling
 
-Predictive modeling project examining pitch characteristics and their relationship with pitch outcomes.
+Predictive Analytics | Logistic Regression | Baseball Analytics
 
-**Tools:** R / Python, Machine Learning, Statistical Modeling
+Built a binary classification model to estimate strike probability using professional pitch-tracking data. Engineered pitch-call outcomes, evaluated pitch type, extension, and count context, and validated predictions on a held-out test set using classification metrics and ROC/AUC analysis.
 
-[View Project](./Pitch-Outcome-Modeling/)
+Tools: R, dplyr, caret, pROC, Logistic Regression, Classification
+
+[View Project](./Strike-Probability-Modeling/)
 
 ---
 
