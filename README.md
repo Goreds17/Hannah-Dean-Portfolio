@@ -71,7 +71,7 @@ This project explores how traditional qualitative scouting information can be in
 
 Built a binary classification model to estimate strike probability using professional pitch-tracking data. Engineered pitch-call outcomes, evaluated pitch type, extension, and count context, and validated predictions on a held-out test set using classification metrics and ROC/AUC analysis.
 
-Tools: R, dplyr, caret, pROC, Logistic Regression, Classification
+**Tools:** R, dplyr, caret, pROC, Logistic Regression, Classification
 
 [View Project](./Strike-Probability-Modeling/)
 
@@ -91,9 +91,9 @@ Statistical analysis investigating how pitcher spin characteristics and batter h
 ### Predicting Pitcher ERA
 **Predictive Modeling | Baseball Research**
 
-A statistical modeling project examining pitcher characteristics and performance metrics to predict ERA.
+Multiple linear regression analysis examining how underlying pitcher performance metrics relate to ERA. Compared candidate models, evaluated multicollinearity and regression assumptions, and analyzed out-of-sample applications using xwOBA and HR/9.
 
-**Tools:** R, Regression, Predictive Modeling
+**Tools:** R, Multiple Linear Regression, Model Selection, VIF, Regression Diagnostics, Statistical Inference
 
 [View Project](./Predicting-Pitcher-ERA/)
 
