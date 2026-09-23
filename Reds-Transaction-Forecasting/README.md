@@ -143,26 +143,6 @@ The project demonstrates how time-series methods can be applied to baseball oper
 - Residual Diagnostics
 - Ljung-Box Testing
 
-## Project Files
-
-### R Analysis
-
-The R script contains the time-series preparation, decomposition, stationarity testing, forecasting models, and model evaluation.
-
-[`analysis/reds_transactions_forecasting.R`](Analysis/reds_transactions_forecasting.R)
-
-### Full Report
-
-The full report contains the methodology, forecasting results, model comparisons, visualizations, and interpretation.
-
-[`reports/reds_transactions_analysis.pdf`](Reports/reds_transactions_analysis.pdf)
-
-### Presentation
-
-The R Markdown presentation contains the original presentation materials for the project.
-
-[`presentation/reds_transactions_presentation.Rmd`](Presentation/reds_transactions_presentation.Rmd)
-
 ## Future Improvements
 
 Future versions of this project could evaluate forecasting performance using a dedicated holdout period rather than relying primarily on training-set error metrics. Additional seasons could also be incorporated to evaluate whether transaction patterns remain consistent over time.
