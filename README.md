@@ -84,7 +84,7 @@ Statistical analysis investigating how pitcher spin characteristics and batter h
 
 **Tools:** R, ANOVA, Statistical Inference, Data Visualization
 
-[View Project](./Spin-Rate-Batter-Handedness/)
+[View Project](./Spin-Rate-Batter-Handiness/)
 
 ---
 
