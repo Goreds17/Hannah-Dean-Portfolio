@@ -18,6 +18,14 @@ My research interests include:
 - Baseball data visualization
 - Baseball operations research
 
+## Portfolio & Resume
+
+For additional project visuals, presentations, and detailed descriptions of my baseball analytics work, visit my full portfolio:
+
+**[Hannah Dean — Sports Analytics Portfolio](https://almondine-mouse-1e3.notion.site/Hannah-Dean-b7938f173b3283c8b3a7812d1bad53eb)**
+
+**[View My Resume](RESUME_LINK_HERE)**
+
 ## Featured Projects
 
 ### Composite Dean's Index (CDI)
