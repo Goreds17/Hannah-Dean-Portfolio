@@ -103,13 +103,13 @@ From a baseball perspective, the results reinforce the value of evaluating the q
 
 The full analysis contains the R code, statistical output, model comparison, inference, visualizations, and regression diagnostics.
 
-[`analysis/predicting_pitcher_era_analysis.pdf`](analysis/predicting_pitcher_era_analysis.pdf)
+[`analysis/predicting_pitcher_era_analysis.pdf`](Analysis/predicting_pitcher_era_analysis.pdf)
 
 ### Presentation
 
 A condensed presentation of the research question, methodology, results, and baseball applications.
 
-[`presentation/predicting_pitcher_era_presentation.pdf`](presentation/predicting_pitcher_era_presentation.pdf)
+[`presentation/predicting_pitcher_era_presentation.pdf`](Presentation/predicting_pitcher_era_presentation.pdf)
 
 ## Future Improvements
 
