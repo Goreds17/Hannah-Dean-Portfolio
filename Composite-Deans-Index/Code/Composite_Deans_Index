@@ -1,0 +1,85 @@
+## full skills for Elite
+# 1) Stuff
+# 2) command
+# 3) miss ability
+# 4) contact suppression
+
+# ---- create full skills table ----
+elite_master <- stuff_pitcher_table %>%
+  select(pitcher, stuff_plus) %>%
+  left_join(command_table %>% select(pitcher, command_score), by = "pitcher") %>%
+  left_join(miss_scores %>% select(pitcher, miss_score), by = "pitcher") %>%
+  left_join(contact_score %>% select(pitcher, contact_score), by = "pitcher")
+
+# ---- create elite final table
+elite_final <- elite_master %>%
+  filter(
+    !is.na(stuff_plus),
+    !is.na(command_score),
+    !is.na(miss_score),
+    !is.na(contact_score)
+  )
+
+# ---- adding pitcher name ----
+pitcher_lookup <-  pitcher_name %>%
+  select(pitcher, pitcher_name) %>%
+  filter(!is.na(pitcher), !is.na(pitcher_name)) %>%
+  distinct()
+
+elite_final <- elite_final %>%
+  left_join(pitcher_lookup, by = "pitcher")
+
+# ---- write elite final rds ----
+write_rds(elite_final, "Elite_Final.RDS")
+
+# ---- skill independence ----
+cor(
+  elite_final %>%
+    select(stuff_plus, command_score, miss_score, contact_score),
+  use = "complete.obs"
+)
+
+# ---- standardize skills ----
+elite_final <- elite_final %>%
+  mutate(
+    z_stuff   = as.numeric(scale(stuff_plus)),
+    z_command = as.numeric(scale(command_score)),
+    z_miss    = as.numeric(scale(miss_score)),
+    z_contact = as.numeric(scale(contact_score))
+  )
+
+# ---- Elite index ----
+elite_final <- elite_final %>%
+  mutate(
+    elite_index =
+      0.30 * z_stuff +
+      0.25 * z_command +
+      0.25 * z_miss +
+      0.20 * z_contact
+  )
+
+# ---- defining elite ----
+elite_final <- elite_final %>%
+  mutate(
+    elite_percentile = percent_rank(elite_index),
+    elite_top_10 = elite_percentile >= 0.90,
+    elite_top_05 = elite_percentile >= 0.95
+  )
+
+# ---- checking consistency ----
+elite_final %>%
+  filter(elite_top_10) %>%
+  summarise(
+    mean_stuff   = mean(z_stuff),
+    mean_command = mean(z_command),
+    mean_miss    = mean(z_miss),
+    mean_contact = mean(z_contact)
+  )
+
+elite_final %>%
+  arrange(desc(z_stuff)) %>%
+  head(10) %>%
+  select(pitcher, z_stuff, elite_index)
+
+# ---- write elite final ----
+write_rds(elite_final, "Full_skills_elite.rds")
