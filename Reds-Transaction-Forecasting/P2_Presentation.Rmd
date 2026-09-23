@@ -1,0 +1,131 @@
+---
+title: "Project 2 Presentation"
+author: "Hannah Dean"
+date: "2024-11-11"
+output:
+  slidy_presentation: default
+  ioslides_presentation: default
+  beamer_presentation: default
+subtitle: Reds Transactions
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F)
+```
+
+
+## Intro
+ - I am analyzing the Cincinnati Reds transactions over the past 10 yrs.
+ - Resources: <https://www.mlb.com/reds/roster/transactions>
+ - Data: **Reds Transactions**
+```{r, echo = F, warning=FALSE, message = FALSE}
+library(tseries)
+library(vars)
+library(forecast)
+library(readr)
+
+# Importing my data
+mydata <- read_csv("Reds10.csv")
+
+mydata$`# of transactions` = replace(mydata$`# of transactions`, c(53,54), 0)
+time_series_data <- ts(mydata$`# of transactions`, frequency = 12, start = c(2014, 1))
+
+
+```
+
+## Time Series Characteristics
+
+- My data is tracking the number of transactions the Reds make each month on their 40-man roster. 
+    - signing
+    - activating
+    - trading
+    - placing on IL
+    - optioning
+    - etc.
+- There are a couple variables that could play a role in impacting the results of how many transactions there are each month:
+    - the trade deadlines
+    - the pre-season transactions
+    - season injuries
+    - etc.
+
+
+## Decomposition Plot
+```{r, out.width="50%", fig.align="center"}
+decomposed_data = decompose(time_series_data)
+plot(decomposed_data)
+```
+
+- Trend: There is slight decreasing trend in the data
+- Seasonality: There is also yearly seasonality in the data
+
+## Autocorrelation Function
+```{r acf, out.width="50%", fig.align="center"}
+# sample autocorrelation function
+acf <- Acf(time_series_data)
+```
+
+This shows us that there is significant yearly seasonality in the data due to the autocorrelation surpassing the bands.
+
+## Decomposition Plot Continued
+```{r adf}
+adf.test(time_series_data)
+```
+
+- My data set is stationary do to the constant mean value over time and little variance increase in the data
+- We can also see that according to the Augmented Dickey-Fuller Test my data rejects the Null Hypothesis with a p-value of .01, therefore concluding my data is stationary
+
+Because there is some trend and seasonality and because my data is stationary I decided to use the Holt-Winters Model
+
+
+## Forecasting Model Choice (Holt Winter Model)
+
+- I chose Exponential Smoothing because my data is stationary
+
+- Out of all three exponential smoothing models I chose the Holt Winter Model because there is both seasonality and slight trend
+
+
+```{r, echo = FALSE}
+library(forecast) 
+hw_model = hw(time_series_data, h = 12)
+```
+
+$$
+\begin{align*}
+  \hat{y}_{t+h|t} &= (\ell_{t} + hb_{t})s_{t+h-m(k+1)} \\
+  \ell_{t} &= .0849 \frac{y_{t}}{s_{t-m}} + (1 - .0849)(\ell_{t-1} + b_{t-1})\\
+  b_{t} &= .0001^*(\ell_{t}-\ell_{t-1}) + (1 - .0001^*)b_{t-1}                \\
+  s_{t} &= .0001 \frac{y_{t}}{(\ell_{t-1} + b_{t-1})} + (1 - .0001)s_{t-m}
+\end{align*}
+$$
+
+## Slide 4: Model Results and Forecast Interpretation 
+
+```{r, out.width="50%", fig.align="center"}
+plot(forecast(hw_model), ylim = c(0,100))
+forecast(hw_model, h = 12)
+```
+
+- My forecasted values show the same general trend in seasonality as my historical data however I would expect some of the numbers to have larger numbers than what was predicted.
+
+
+
+## Slide 5: Model Diagnostics and Accuracy Evaluation
+```{r accuracy}
+accuracy(forecast(hw_model))
+ses_model <- ses(time_series_data, h= 12)
+accuracy(forecast(ses_model))
+holt_model <- holt(time_series_data, h = 12)
+accuracy(forecast(holt_model, h = 12))
+```
+
+- RMSE: Takes into consideration the large error variables in the prediction process therefore predictions could be off by 16 transactions a month
+    - For Simple Exponential Smoothing and Holts Linear Model the predictions are off by 23 transactions a month
+- MAE: Predictions are off by 12 transactions a month
+    - For Simple Exponential Smoothing and Holts Linear Model the predictions are off by 20 transactions a month
+- MASE: This model is more accurate than a naive model
+    - For Simple Exponential Smoothing and Holts Linear Model the value for MASE surpasses 1 meaning that naive model would be more accurate
+- ACF1: Little correlation in errors
+    - For Simple Exponential Smoothing and Holts Linear Model correlation in errors is relitevely the same as the Holt Winters
+
+
+
