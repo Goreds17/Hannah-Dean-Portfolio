@@ -1,2 +1,114 @@
 # Hannah-Dean-Portfolio
 Sports Analytics &amp; Data Science portfolio featuring baseball research, statistical modeling, machine learning, and data visualization.
+
+# Hannah Dean | Sports Analytics & Data Science
+
+Welcome to my portfolio! I am a Sports Analytics student with a minor in Data Science at California Baptist University, with a focus on baseball analytics, statistical modeling, machine learning, and player development.
+
+My work focuses on using data to answer baseball questions and turning statistical results into information that can be applied to player evaluation, player development, and baseball operations.
+
+## ⚾ Baseball Analytics Experience
+
+I currently serve as the Director of Analytics for the Ogden Raptors of the Pioneer Baseball League, where I work with pitch-level data, player evaluation, scouting reports, and analytical tools designed for coaches and players.
+
+My research interests include:
+
+- Pitcher evaluation and pitch quality
+- Player development
+- Batter-pitcher matchup modeling
+- Predictive modeling and machine learning
+- Statistical modeling
+- Baseball data visualization
+- Baseball operations research
+
+## Featured Projects
+
+### Composite Dean's Index (CDI)
+**Pitcher Evaluation | Statistical Modeling | Baseball Research**
+
+A pitcher evaluation framework designed to measure pitcher dominance by combining multiple dimensions of pitching performance, including Stuff, Command, Miss, and Contact quality.
+
+The research has been presented at SABR conferences and is currently being prepared for publication.
+
+**Tools:** R, Python, Statistical Modeling, Machine Learning
+
+> Full implementation code is not currently public while this research is being prepared for publication.
+
+[View Project](./Composite-Deans-Index/)
+
+---
+
+### Pitch Outcome Modeling
+**Predictive Analytics | Machine Learning**
+
+Predictive modeling project examining pitch characteristics and their relationship with pitch outcomes.
+
+**Tools:** R / Python, Machine Learning, Statistical Modeling
+
+[View Project](./Pitch-Outcome-Modeling/)
+
+---
+
+### Effects of Spin Rate and Batter Handedness on Exit Velocity
+**ANOVA | Statistical Research | Pioneer League**
+
+Statistical analysis investigating how pitcher spin characteristics and batter handedness interact in relation to batted-ball exit velocity.
+
+**Tools:** R, ANOVA, Statistical Inference, Data Visualization
+
+[View Project](./Spin-Rate-Batter-Handedness/)
+
+---
+
+### Predicting Pitcher ERA
+**Predictive Modeling | Baseball Research**
+
+A statistical modeling project examining pitcher characteristics and performance metrics to predict ERA.
+
+**Tools:** R, Regression, Predictive Modeling
+
+[View Project](./Predicting-Pitcher-ERA/)
+
+---
+
+### Cincinnati Reds Transactions Time Series Forecasting
+**Time Series | Forecasting | Baseball Research**
+
+Time-series analysis of Cincinnati Reds transaction activity with forecasting methods used to examine patterns over time.
+
+**Tools:** R, Time Series Analysis, Forecasting
+
+[View Project](./Reds-Transaction-Forecasting/)
+
+---
+
+## Current Research
+
+### Batter-Pitcher Matchup Prediction
+
+Developing a machine learning framework for identifying matchup advantages based on pitcher arsenals, pitch characteristics, batter strengths and weaknesses, and game context.
+
+The project compares machine learning approaches against traditional matchup baselines.
+
+**Tools:** Python, SQL, Neural Networks, XGBoost, Log5
+
+---
+
+## Technical Skills
+
+**Programming:** R, Python, SQL  
+**Machine Learning:** XGBoost, Neural Networks, Predictive Modeling, Model Validation  
+**Statistics:** Regression, ANOVA, Statistical Inference, Feature Engineering  
+**Visualization:** ggplot2, Tableau, Power BI  
+**Baseball Data:** Pitch-level analysis, TrackMan data, advanced pitching metrics
+
+## Research Interests
+
+My long-term interests center around developing analytical methods that help baseball organizations better understand player talent and translate quantitative research into actionable baseball decisions.
+
+Areas of particular interest include pitcher evaluation, player development, predictive modeling, matchup analysis, and baseball research & development.
+
+## Connect With Me
+
+**LinkedIn:** www.linkedin.com/in/hannah-dean-034545297
+**Email:** HannahFaith.Dean@Calbaptist.edu
