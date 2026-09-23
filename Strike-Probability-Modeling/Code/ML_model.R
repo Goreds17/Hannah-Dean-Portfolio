@@ -6,10 +6,14 @@ library(dplyr)
 library(readr)
 
 # Impoprting Data Set
-Pacheco <- read_csv("Copy_of_Pacheco_08_07.csv", 
-                    col_types = cols(TaggedPitchType = col_factor(levels = c("Four-Seam", 
-                                                                             "Sinker", "Changeup", "Slider"))))
-View(Pacheco)
+pitches <- read_csv(
+  "data/pacheco_pitch_data.csv",
+  col_types = cols(
+    TaggedPitchType = col_factor(
+      levels = c("Four-Seam", "Sinker", "Changeup", "Slider")
+    )
+  )
+)
 
 # Turning "Pitch Call" into a logistical expression
 pacheco <- Pacheco %>%
