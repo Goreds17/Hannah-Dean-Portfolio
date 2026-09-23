@@ -1,0 +1,1510 @@
+---
+title: "Plus metrics validation"
+author: "Hannah Dean"
+date: "2026-07-11"
+output:
+  word_document:
+    toc: true
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE
+)
+
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(readr)
+library(ggplot2)
+library(broom)
+library(car)
+library(rsample)
+library(yardstick)
+library(MASS)
+library(corrplot)
+library(knitr)
+
+set.seed(42)
+```
+
+```{r load-data}
+P_stats_with_stuff <- readRDS(
+  "data/P_stats_with_stuff.rds"
+)
+
+Command_Metrics_Table <- readRDS(
+  "data/Command_Metrics_Table.rds"
+)
+
+Miss_Ability_Table <- readRDS(
+  "data/Miss_Ability_Table.rds"
+)
+
+Contact_Metrics_Table <- readRDS(
+  "data/Contact_Metrics_Table.rds"
+)
+
+PBP <- readRDS(
+  "data/PBP.rds"
+)
+
+P_stats <- readRDS(
+  "data/P_stats.rds"
+)
+```
+
+```{r master analysis}
+# ============================================================
+# CREATE MASTER ELITE TEST TABLE
+# ============================================================
+
+elite_test <- P_stats_with_stuff %>%
+
+  # Fangraphs / pitching model metrics
+  dplyr::select(
+    pitcher,
+    player_full_name,
+    stuff_plus,
+    location_plus,
+    pitching_plus
+  ) %>%
+
+  dplyr::distinct(
+    pitcher,
+    .keep_all = TRUE
+  ) %>%
+
+  # Add command score
+  dplyr::left_join(
+    Command_Metrics_Table %>%
+      dplyr::select(
+        pitcher,
+        command_score
+      ) %>%
+      dplyr::distinct(
+        pitcher,
+        .keep_all = TRUE
+      ),
+    by = "pitcher"
+  ) %>%
+
+  # Add miss ability score
+  dplyr::left_join(
+    Miss_Ability_Table %>%
+      dplyr::select(
+        pitcher,
+        miss_score
+      ) %>%
+      dplyr::distinct(
+        pitcher,
+        .keep_all = TRUE
+      ),
+    by = "pitcher"
+  ) %>%
+
+  # Add contact management score
+  dplyr::left_join(
+    Contact_Metrics_Table %>%
+      dplyr::select(
+        pitcher,
+        contact_score
+      ) %>%
+      dplyr::distinct(
+        pitcher,
+        .keep_all = TRUE
+      ),
+    by = "pitcher"
+  ) %>%
+
+  # ==========================================================
+  # STANDARDIZE ALL COMPONENTS
+  # ==========================================================
+
+  dplyr::mutate(
+    dplyr::across(
+      c(
+        stuff_plus,
+        location_plus,
+        pitching_plus,
+        command_score,
+        miss_score,
+        contact_score
+      ),
+      ~ as.numeric(scale(.x)),
+      .names = "z_{.col}"
+    )
+  ) %>%
+
+  # Rename standardized columns
+  dplyr::rename(
+    z_stuff = z_stuff_plus,
+    z_location = z_location_plus,
+    z_pitching = z_pitching_plus,
+    z_command = z_command_score,
+    z_miss = z_miss_score,
+    z_contact = z_contact_score
+  ) %>%
+
+  # ==========================================================
+  # CREATE ELITE SCORE VERSIONS
+  # ==========================================================
+
+  dplyr::mutate(
+
+    # Original model using Stuff+
+    elite_original =
+      0.30 * z_stuff +
+      0.25 * z_command +
+      0.25 * z_miss +
+      0.20 * z_contact,
+
+    # Replace Stuff+ with Pitching+
+    elite_pitching_only =
+      0.30 * z_pitching +
+      0.25 * z_command +
+      0.25 * z_miss +
+      0.20 * z_contact,
+
+    # Split the original 30% between Stuff+ and Location+
+    elite_stuff_location =
+      0.18 * z_stuff +
+      0.12 * z_location +
+      0.25 * z_command +
+      0.25 * z_miss +
+      0.20 * z_contact,
+
+    # Split the original 30% among Stuff+, Location+, and Pitching+
+    elite_all_three =
+      0.12 * z_stuff +
+      0.08 * z_location +
+      0.10 * z_pitching +
+      0.25 * z_command +
+      0.25 * z_miss +
+      0.20 * z_contact
+  ) %>%
+
+  # ==========================================================
+  # CREATE PERCENTILES
+  # ==========================================================
+
+  dplyr::mutate(
+    dplyr::across(
+      dplyr::starts_with("elite_"),
+      ~ dplyr::percent_rank(.x),
+      .names = "{.col}_percentile"
+    )
+  ) %>%
+
+  # ==========================================================
+  # IDENTIFY TOP-10% PITCHERS
+  # ==========================================================
+
+  dplyr::mutate(
+    dplyr::across(
+      dplyr::ends_with("_percentile"),
+      ~ dplyr::if_else(
+        is.na(.x),
+        NA,
+        .x >= 0.90
+      ),
+      .names = "{.col}_top_10"
+    )
+  )
+
+# ============================================================
+# VIEW RESULTS
+# ============================================================
+
+elite_test %>%
+  dplyr::select(
+    pitcher,
+    player_full_name,
+    stuff_plus,
+    location_plus,
+    pitching_plus,
+    command_score,
+    miss_score,
+    contact_score,
+    dplyr::starts_with("elite_")
+  ) %>%
+  dplyr::arrange(
+    dplyr::desc(elite_original)
+  ) %>%
+  View()
+```
+
+## Validation Outcomes
+```{r run value}
+run_value_tbl <- PBP %>%
+  filter(!is.na(pitcher)) %>%
+  group_by(pitcher) %>%
+  summarise(
+    total_delta_pitcher_run_exp =
+      sum(delta_pitcher_run_exp, na.rm = TRUE),
+
+    n_pitches = n(),
+
+    drx100 =
+      100 * total_delta_pitcher_run_exp / n_pitches,
+
+    .groups = "drop"
+  )
+```
+
+```{r bench table}
+bench_tbl <- P_stats %>%
+  transmute(
+    pitcher,
+    ERA = era,
+    IP = innings_pitched,
+    K9 = strikeouts_per9inn,
+    BB9 = walks_per9inn,
+    HR9 = home_runs_per9,
+    WHIP = whip
+  ) %>%
+  distinct(pitcher, .keep_all = TRUE)
+```
+
+``` {r fip components}
+fip_components <- PBP %>%
+  filter(!is.na(pitcher)) %>%
+  group_by(pitcher) %>%
+  summarise(
+    HR = sum(events == "home_run", na.rm = TRUE),
+
+    BB = sum(
+      events %in% c("walk", "intent_walk"),
+      na.rm = TRUE
+    ),
+
+    HBP = sum(
+      events == "hit_by_pitch",
+      na.rm = TRUE
+    ),
+
+    K = sum(
+      events %in% c(
+        "strikeout",
+        "strikeout_double_play"
+      ),
+      na.rm = TRUE
+    ),
+
+    .groups = "drop"
+  )
+```
+
+```{r lg_const}
+lg_const <- 3.10
+
+fip_tbl <- fip_components %>%
+  dplyr::left_join(
+    bench_tbl %>%
+      dplyr::select(pitcher, IP),
+    by = "pitcher"
+  ) %>%
+  dplyr::filter(!is.na(IP), IP > 0) %>%
+  dplyr::mutate(
+    FIP_est =
+      (13 * HR + 3 * (BB + HBP) - 2 * K) / IP +
+      lg_const
+  ) %>%
+  dplyr::select(
+    pitcher,
+    FIP_est
+  )
+```
+
+```{r val_dat}
+val_dat <- elite_test %>%
+  left_join(run_value_tbl, by = "pitcher") %>%
+  left_join(bench_tbl, by = "pitcher") %>%
+  left_join(fip_tbl, by = "pitcher")
+```
+
+```{r variables}
+model_variables <- c(
+  "elite_original",
+  "elite_pitching_only",
+  "elite_stuff_location",
+  "elite_all_three",
+  "z_stuff",
+  "z_location",
+  "z_pitching",
+  "z_command",
+  "z_miss",
+  "z_contact",
+  "drx100"
+)
+
+val_common <- val_dat %>%
+  filter(
+    if_all(
+      all_of(model_variables),
+      ~ !is.na(.x)
+    )
+  )
+```
+
+```{r}
+cat("Common validation sample:", nrow(val_common), "pitchers")
+```
+
+## direction of drx100
+```{r val_common}
+val_common %>%
+  summarise(
+    cor_drx_ERA = cor(drx100, ERA, use = "complete.obs"),
+    cor_drx_FIP = cor(drx100, FIP_est, use = "complete.obs"),
+    cor_drx_WHIP = cor(drx100, WHIP, use = "complete.obs")
+  )
+```
+
+## Correlation & redundancy analysis
+```{r}
+skill_vars <- val_common %>%
+  dplyr::select(
+    stuff_plus,
+    location_plus,
+    pitching_plus,
+    command_score,
+    miss_score,
+    contact_score
+  )
+
+skill_cor <- cor(
+  skill_vars,
+  use = "pairwise.complete.obs",
+  method = "pearson"
+)
+
+round(skill_cor, 3)
+
+corrplot::corrplot(
+  skill_cor,
+  method = "number"
+)
+```
+## Spearman Correlation
+```{r spearman}
+skill_cor_spearman <- cor(
+  skill_vars,
+  use = "pairwise.complete.obs",
+  method = "spearman"
+)
+
+round(skill_cor_spearman, 3)
+```
+## Construct-Validity tests
+```{r construct-validity}
+construct_models <- list(
+  stuff_predicts_miss =
+    lm(z_miss ~ z_stuff, data = val_common),
+
+  location_predicts_command =
+    lm(z_command ~ z_location, data = val_common),
+
+  stuff_predicts_K9 =
+    lm(K9 ~ z_stuff, data = val_common),
+
+  location_predicts_BB9 =
+    lm(BB9 ~ z_location, data = val_common),
+
+  pitching_predicts_drx =
+    lm(drx100 ~ z_pitching, data = val_common)
+)
+
+construct_results <- imap_dfr(
+  construct_models,
+  ~ tidy(.x, conf.int = TRUE) %>%
+    mutate(model = .y)
+)
+
+construct_results
+```
+
+## Compare each elite index against drx100
+```{r}
+index_names <- c(
+  "elite_original",
+  "elite_pitching_only",
+  "elite_stuff_location",
+  "elite_all_three"
+)
+
+index_models <- set_names(index_names) %>%
+  map(
+    ~ lm(
+      reformulate(.x, response = "drx100"),
+      data = val_common
+    )
+  )
+```
+
+```{r}
+index_fit_tbl <- purrr::imap_dfr(
+  index_models,
+  function(model, model_name) {
+    broom::glance(model) %>%
+      dplyr::mutate(model = model_name)
+  }
+) %>%
+  dplyr::select(
+    model,
+    nobs,
+    r.squared,
+    adj.r.squared,
+    sigma,
+    AIC,
+    BIC
+  ) %>%
+  dplyr::arrange(BIC)
+
+knitr::kable(index_fit_tbl, digits = 3)
+```
+
+```{r}
+index_coef_tbl <- imap_dfr(
+  index_models,
+  function(model, model_name) {
+    tidy(model, conf.int = TRUE) %>%
+      filter(term != "(Intercept)") %>%
+      mutate(model = model_name)
+  }
+)
+
+kable(index_coef_tbl, digits = 3)
+```
+
+## Rax Index Correlations
+```{r}
+index_correlations <- map_dfr(
+  index_names,
+  function(index_name) {
+    tibble(
+      model = index_name,
+
+      pearson =
+        cor(
+          val_common[[index_name]],
+          val_common$drx100,
+          use = "complete.obs",
+          method = "pearson"
+        ),
+
+      spearman =
+        cor(
+          val_common[[index_name]],
+          val_common$drx100,
+          use = "complete.obs",
+          method = "spearman"
+        )
+    )
+  }
+)
+
+kable(index_correlations, digits = 3)
+```
+
+## Component-level models
+```{r }
+component_models <- list(
+  original_components =
+    lm(
+      drx100 ~
+        z_stuff +
+        z_command +
+        z_miss +
+        z_contact,
+      data = val_common
+    ),
+
+  pitching_components =
+    lm(
+      drx100 ~
+        z_pitching +
+        z_command +
+        z_miss +
+        z_contact,
+      data = val_common
+    ),
+
+  stuff_location_components =
+    lm(
+      drx100 ~
+        z_stuff +
+        z_location +
+        z_command +
+        z_miss +
+        z_contact,
+      data = val_common
+    ),
+
+  all_three_components =
+    lm(
+      drx100 ~
+        z_stuff +
+        z_location +
+        z_pitching +
+        z_command +
+        z_miss +
+        z_contact,
+      data = val_common
+    )
+)
+```
+
+```{r }
+component_fit_tbl <- purrr::imap_dfr(
+  component_models,
+  function(model, model_name) {
+    broom::glance(model) %>%
+      dplyr::mutate(model = model_name)
+  }
+) %>%
+  dplyr::select(
+    model,
+    nobs,
+    r.squared,
+    adj.r.squared,
+    sigma,
+    AIC,
+    BIC
+  ) %>%
+  dplyr::arrange(BIC)
+
+knitr::kable(
+  component_fit_tbl,
+  digits = 3
+)
+```
+## Nested tests for incremental info
+```{r}
+m_base <- lm(
+  drx100 ~
+    z_command +
+    z_miss +
+    z_contact,
+  data = val_common
+)
+
+m_add_stuff <- update(
+  m_base,
+  . ~ . + z_stuff
+)
+
+m_add_stuff_location <- update(
+  m_base,
+  . ~ . + z_stuff + z_location
+)
+
+m_add_pitching <- update(
+  m_base,
+  . ~ . + z_pitching
+)
+
+m_add_all <- update(
+  m_base,
+  . ~ . + z_stuff + z_location + z_pitching
+)
+```
+
+```{r}
+anova(m_base, m_add_stuff)
+anova(m_base, m_add_stuff_location)
+anova(m_base, m_add_pitching)
+anova(m_base, m_add_all)
+anova(m_add_stuff_location, m_add_all)
+```
+## Multicollinearity
+```{r}
+vif_results <- imap_dfr(
+  component_models,
+  function(model, model_name) {
+    vif_values <- car::vif(model)
+
+    tibble(
+      model = model_name,
+      variable = names(vif_values),
+      VIF = as.numeric(vif_values)
+    )
+  }
+)
+
+kable(vif_results, digits = 2)
+```
+## Benchmark Comparison
+```{r}
+benchmark_variables <- c(
+  "ERA",
+  "FIP_est",
+  "WHIP",
+  "K9",
+  "BB9",
+  "HR9"
+)
+
+benchmark_variables <- benchmark_variables[
+  benchmark_variables %in% names(val_common)
+]
+```
+
+```{r}
+single_predictors <- c(
+  index_names,
+  "stuff_plus",
+  "location_plus",
+  "pitching_plus",
+  benchmark_variables
+)
+
+single_metric_models <- set_names(single_predictors) %>%
+  map(
+    ~ lm(
+      reformulate(.x, response = "drx100"),
+      data = val_common
+    )
+  )
+```
+
+```{r}
+single_metric_fit <- purrr::imap_dfr(
+  single_metric_models,
+  function(model, model_name) {
+    broom::glance(model) %>%
+      dplyr::mutate(model = model_name)
+  }
+) %>%
+  dplyr::select(
+    model,
+    nobs,
+    r.squared,
+    adj.r.squared,
+    sigma,
+    AIC,
+    BIC
+  ) %>%
+  dplyr::arrange(BIC)
+
+knitr::kable(
+  single_metric_fit,
+  digits = 3
+)
+```
+
+
+## Incremental Value beyond benchmarks
+```{r}
+incremental_models <- crossing(
+  index = index_names,
+  benchmark = intersect(
+    c("ERA", "FIP_est", "WHIP"),
+    names(val_common)
+  )
+) %>%
+  mutate(
+    benchmark_only = map(
+      benchmark,
+      ~ lm(
+        reformulate(.x, response = "drx100"),
+        data = val_common
+      )
+    ),
+
+    benchmark_plus_index = map2(
+      benchmark,
+      index,
+      ~ lm(
+        reformulate(
+          c(.x, .y),
+          response = "drx100"
+        ),
+        data = val_common
+      )
+    ),
+
+    comparison = map2(
+      benchmark_only,
+      benchmark_plus_index,
+      anova
+    ),
+
+    base_adj_r2 = map_dbl(
+      benchmark_only,
+      ~ glance(.x)$adj.r.squared
+    ),
+
+    combined_adj_r2 = map_dbl(
+      benchmark_plus_index,
+      ~ glance(.x)$adj.r.squared
+    ),
+
+    delta_adj_r2 =
+      combined_adj_r2 - base_adj_r2,
+
+    combined_AIC = map_dbl(
+      benchmark_plus_index,
+      AIC
+    )
+  )
+```
+
+```{r}
+incremental_models %>%
+  dplyr::select(
+    index,
+    benchmark,
+    base_adj_r2,
+    combined_adj_r2,
+    delta_adj_r2,
+    combined_AIC
+  ) %>%
+  dplyr::arrange(
+    dplyr::desc(delta_adj_r2)
+  ) %>%
+  knitr::kable(
+    digits = 3
+  )
+```
+
+## Repeated cross-validation
+```{r}
+repeated_kfold_lm <- function(
+  data,
+  formula,
+  K = 10,
+  repeats = 25,
+  seed = 42
+) {
+
+  set.seed(seed)
+
+  results <- map_dfr(
+    seq_len(repeats),
+    function(repeat_id) {
+
+      fold_id <- sample(
+        rep(1:K, length.out = nrow(data))
+      )
+
+      predictions <- rep(NA_real_, nrow(data))
+
+      for (k in seq_len(K)) {
+
+        train <- data[
+          fold_id != k,
+          ,
+          drop = FALSE
+        ]
+
+        test <- data[
+          fold_id == k,
+          ,
+          drop = FALSE
+        ]
+
+        fit <- lm(formula, data = train)
+
+        predictions[fold_id == k] <-
+          predict(fit, newdata = test)
+      }
+
+      observed <- model.response(
+        model.frame(formula, data = data)
+      )
+
+      tibble(
+        repeat_id = repeat_id,
+
+        RMSE = sqrt(
+          mean(
+            (observed - predictions)^2,
+            na.rm = TRUE
+          )
+        ),
+
+        R2 = 1 -
+          sum(
+            (observed - predictions)^2,
+            na.rm = TRUE
+          ) /
+          sum(
+            (observed - mean(observed))^2,
+            na.rm = TRUE
+          ),
+
+        correlation = cor(
+          observed,
+          predictions,
+          use = "complete.obs"
+        )
+      )
+    }
+  )
+
+  results
+}
+```
+
+```{r}
+cv_formulas <- list(
+  elite_original =
+    drx100 ~ elite_original,
+
+  elite_pitching_only =
+    drx100 ~ elite_pitching_only,
+
+  elite_stuff_location =
+    drx100 ~ elite_stuff_location,
+
+  elite_all_three =
+    drx100 ~ elite_all_three,
+
+  original_components =
+    drx100 ~
+      z_stuff +
+      z_command +
+      z_miss +
+      z_contact,
+
+  pitching_components =
+    drx100 ~
+      z_pitching +
+      z_command +
+      z_miss +
+      z_contact,
+
+  stuff_location_components =
+    drx100 ~
+      z_stuff +
+      z_location +
+      z_command +
+      z_miss +
+      z_contact,
+
+  all_three_components =
+    drx100 ~
+      z_stuff +
+      z_location +
+      z_pitching +
+      z_command +
+      z_miss +
+      z_contact
+)
+```
+
+```{r}
+cv_results <- imap_dfr(
+  cv_formulas,
+  function(formula, model_name) {
+    repeated_kfold_lm(
+      data = val_common,
+      formula = formula,
+      K = 10,
+      repeats = 25
+    ) %>%
+      mutate(model = model_name)
+  }
+)
+```
+
+```{r}
+cv_summary <- cv_results %>%
+  group_by(model) %>%
+  summarise(
+    mean_RMSE = mean(RMSE),
+    sd_RMSE = sd(RMSE),
+    mean_R2 = mean(R2),
+    sd_R2 = sd(R2),
+    mean_correlation = mean(correlation),
+    sd_correlation = sd(correlation),
+    .groups = "drop"
+  ) %>%
+  arrange(mean_RMSE)
+
+kable(cv_summary, digits = 3)
+```
+
+## Ranking correlations
+```{r}
+ranking_cor <- val_common %>%
+  dplyr::select(
+    dplyr::all_of(index_names)
+  ) %>%
+  cor(
+    use = "complete.obs",
+    method = "spearman"
+  )
+
+round(ranking_cor, 3)
+
+corrplot::corrplot(
+  ranking_cor,
+  method = "number"
+)
+```
+
+## Top-10% overlap
+```{r}
+top10_sets <- map(
+  index_names,
+  function(index_name) {
+    val_common %>%
+      filter(
+        percent_rank(.data[[index_name]]) >= 0.90
+      ) %>%
+      pull(pitcher)
+  }
+)
+
+names(top10_sets) <- index_names
+```
+
+```{r}
+jaccard_similarity <- function(x, y) {
+  length(intersect(x, y)) /
+    length(union(x, y))
+}
+```
+
+```{r}
+top10_overlap <- crossing(
+  model_1 = index_names,
+  model_2 = index_names
+) %>%
+  mutate(
+    jaccard = map2_dbl(
+      model_1,
+      model_2,
+      ~ jaccard_similarity(
+        top10_sets[[.x]],
+        top10_sets[[.y]]
+      )
+    )
+  )
+
+top10_overlap
+```
+
+## Largest ranking changes
+```{r}
+rank_change_tbl <- val_common %>%
+  transmute(
+    pitcher,
+    player_full_name,
+
+    rank_original =
+      min_rank(desc(elite_original)),
+
+    rank_pitching_only =
+      min_rank(desc(elite_pitching_only)),
+
+    rank_stuff_location =
+      min_rank(desc(elite_stuff_location)),
+
+    rank_all_three =
+      min_rank(desc(elite_all_three)),
+
+    original_to_pitching_change =
+      rank_original - rank_pitching_only,
+
+    original_to_stuff_location_change =
+      rank_original - rank_stuff_location,
+
+    original_to_all_three_change =
+      rank_original - rank_all_three
+  )
+```
+
+```{r}
+rank_change_tbl %>%
+  arrange(
+    desc(abs(original_to_pitching_change))
+  ) %>%
+  slice_head(n = 20) %>%
+  kable()
+```
+
+## Elite threshold sensitivity
+```{r}
+index_names <- c(
+  "elite_original",
+  "elite_pitching_only",
+  "elite_stuff_location",
+  "elite_all_three"
+)
+
+thresholds <- c(
+  0.80,
+  0.85,
+  0.90,
+  0.95
+)
+
+threshold_results <- tidyr::crossing(
+  index = index_names,
+  threshold = thresholds
+) %>%
+  dplyr::mutate(
+    results = purrr::map2(
+      index,
+      threshold,
+      function(index_name, cutoff) {
+
+        temp <- val_common
+
+        temp$percentile <- dplyr::percent_rank(
+          temp[[index_name]]
+        )
+
+        temp$elite_group <-
+          temp$percentile >= cutoff
+
+        temp %>%
+          dplyr::group_by(elite_group) %>%
+          dplyr::summarise(
+            n = dplyr::n(),
+            mean_drx100 = mean(
+              drx100,
+              na.rm = TRUE
+            ),
+            median_drx100 = median(
+              drx100,
+              na.rm = TRUE
+            ),
+            .groups = "drop"
+          )
+      }
+    )
+  ) %>%
+  tidyr::unnest(
+    cols = results
+  )
+
+threshold_results %>%
+  dplyr::arrange(
+    index,
+    threshold,
+    elite_group
+  ) %>%
+  knitr::kable(
+    digits = 3,
+    caption = "Elite Threshold Sensitivity Results"
+  )
+```
+
+## Sample- size sensitivity
+```{r}
+pitch_thresholds <- c(
+  250,
+  500,
+  750,
+  1000
+)
+
+sample_sensitivity <- tidyr::crossing(
+  model = index_names,
+  minimum_pitches = pitch_thresholds
+) %>%
+  dplyr::mutate(
+    fit = purrr::map2(
+      model,
+      minimum_pitches,
+      function(model_name, pitch_cutoff) {
+
+        sample_dat <- val_common %>%
+          dplyr::filter(
+            n_pitches >= pitch_cutoff
+          )
+
+        if (nrow(sample_dat) < 20) {
+          return(NULL)
+        }
+
+        stats::lm(
+          stats::reformulate(
+            model_name,
+            response = "drx100"
+          ),
+          data = sample_dat
+        )
+      }
+    ),
+
+    results = purrr::map(
+      fit,
+      function(model_object) {
+
+        if (is.null(model_object)) {
+          return(
+            tibble::tibble(
+              n = NA_integer_,
+              estimate = NA_real_,
+              r_squared = NA_real_,
+              adj_r_squared = NA_real_,
+              RMSE = NA_real_
+            )
+          )
+        }
+
+        coefficient <- broom::tidy(
+          model_object
+        ) %>%
+          dplyr::filter(
+            term != "(Intercept)"
+          ) %>%
+          dplyr::pull(
+            estimate
+          )
+
+        fit_stats <- broom::glance(
+          model_object
+        )
+
+        tibble::tibble(
+          n = as.integer(fit_stats$nobs),
+          estimate = coefficient,
+          r_squared = fit_stats$r.squared,
+          adj_r_squared = fit_stats$adj.r.squared,
+          RMSE = fit_stats$sigma
+        )
+      }
+    )
+  ) %>%
+  dplyr::select(
+    -fit
+  ) %>%
+  tidyr::unnest(
+    cols = results
+  ) %>%
+  dplyr::arrange(
+    minimum_pitches,
+    dplyr::desc(adj_r_squared)
+  )
+
+knitr::kable(
+  sample_sensitivity,
+  digits = 3
+)
+```
+
+## Outlier & Influence Analysis
+```{r}
+preferred_candidate <- stats::lm(
+  drx100 ~ elite_stuff_location,
+  data = val_common
+)
+
+influence_tbl <- broom::augment(
+  preferred_candidate
+) %>%
+  dplyr::bind_cols(
+    val_common %>%
+      dplyr::select(
+        pitcher,
+        player_full_name
+      )
+  ) %>%
+  dplyr::arrange(
+    dplyr::desc(.cooksd)
+  )
+
+influence_tbl %>%
+  dplyr::select(
+    pitcher,
+    player_full_name,
+    .fitted,
+    .resid,
+    .std.resid,
+    .hat,
+    .cooksd
+  ) %>%
+  dplyr::slice_head(
+    n = 15
+  ) %>%
+  knitr::kable(
+    digits = 3
+  )
+```
+
+```{r}
+cooks_cutoff <- 4 / nrow(val_common)
+
+influential_pitchers <- influence_tbl %>%
+  filter(.cooksd > cooks_cutoff)
+
+influential_pitchers
+```
+
+```{r}
+robust_sample <- val_common %>%
+  filter(
+    !pitcher %in% influential_pitchers$pitcher
+  )
+
+lm(
+  drx100 ~ elite_stuff_location,
+  data = robust_sample
+) %>%
+  summary()
+```
+## Robust regression
+```{r}
+robust_models <- map(
+  index_names,
+  function(index_name) {
+    MASS::rlm(
+      reformulate(
+        index_name,
+        response = "drx100"
+      ),
+      data = val_common
+    )
+  }
+)
+
+names(robust_models) <- index_names
+```
+
+```{r}
+robust_coef_tbl <- imap_dfr(
+  robust_models,
+  function(model, model_name) {
+    tidy(model) %>%
+      mutate(model = model_name)
+  }
+)
+
+robust_coef_tbl
+```
+
+## Weight sensitivity
+```{r}
+weight_scenarios <- tribble(
+  ~scenario, ~fg_weight, ~command_weight, ~miss_weight, ~contact_weight,
+  "FG 20",       0.20,          0.30,        0.30,          0.20,
+  "FG 25",       0.25,          0.275,       0.275,         0.20,
+  "FG 30",       0.30,          0.25,        0.25,          0.20,
+  "FG 35",       0.35,          0.225,       0.225,         0.20,
+  "Equal",       0.25,          0.25,        0.25,          0.25
+)
+```
+
+```{r}
+weight_sensitivity <- weight_scenarios %>%
+  dplyr::mutate(
+    results = purrr::pmap(
+      list(
+        scenario,
+        fg_weight,
+        command_weight,
+        miss_weight,
+        contact_weight
+      ),
+      function(
+        scenario,
+        fg_weight,
+        command_weight,
+        miss_weight,
+        contact_weight
+      ) {
+
+        temp <- val_common %>%
+          dplyr::mutate(
+            test_index =
+              fg_weight * z_pitching +
+              command_weight * z_command +
+              miss_weight * z_miss +
+              contact_weight * z_contact
+          )
+
+        fit <- stats::lm(
+          drx100 ~ test_index,
+          data = temp
+        )
+
+        tibble::tibble(
+          scenario = scenario,
+
+          spearman_drx = stats::cor(
+            temp$test_index,
+            temp$drx100,
+            method = "spearman",
+            use = "complete.obs"
+          ),
+
+          estimate = broom::tidy(fit) %>%
+            dplyr::filter(
+              term == "test_index"
+            ) %>%
+            dplyr::pull(
+              estimate
+            ),
+
+          adj_r_squared = broom::glance(fit)$adj.r.squared,
+
+          RMSE = broom::glance(fit)$sigma
+        )
+      }
+    )
+  ) %>%
+  dplyr::select(
+    results
+  ) %>%
+  tidyr::unnest(
+    cols = results
+  )
+
+weight_sensitivity
+```
+
+## Bootstrap model comparison
+```{r}
+bootstrap_compare <- function(
+  data,
+  index_names,
+  B = 1000,
+  seed = 42
+) {
+
+  set.seed(seed)
+
+  map_dfr(
+    seq_len(B),
+    function(b) {
+
+      boot_dat <- data[
+        sample(
+          seq_len(nrow(data)),
+          replace = TRUE
+        ),
+        ,
+        drop = FALSE
+      ]
+
+      map_dfr(
+        index_names,
+        function(index_name) {
+
+          fit <- lm(
+            reformulate(
+              index_name,
+              response = "drx100"
+            ),
+            data = boot_dat
+          )
+
+          tibble(
+            bootstrap = b,
+            model = index_name,
+            estimate =
+              coef(fit)[[index_name]],
+            adj_r_squared =
+              glance(fit)$adj.r.squared,
+            RMSE =
+              glance(fit)$sigma
+          )
+        }
+      )
+    }
+  )
+}
+```
+
+```{r}
+bootstrap_results <- bootstrap_compare(
+  data = val_common,
+  index_names = index_names,
+  B = 1000
+)
+```
+
+```{r}
+bootstrap_summary <- bootstrap_results %>%
+  group_by(model) %>%
+  summarise(
+    mean_estimate = mean(estimate, na.rm = TRUE),
+    estimate_low = quantile(
+      estimate,
+      0.025,
+      na.rm = TRUE
+    ),
+    estimate_high = quantile(
+      estimate,
+      0.975,
+      na.rm = TRUE
+    ),
+    mean_adj_r2 = mean(
+      adj_r_squared,
+      na.rm = TRUE
+    ),
+    mean_RMSE = mean(
+      RMSE,
+      na.rm = TRUE
+    ),
+    .groups = "drop"
+  ) %>%
+  arrange(mean_RMSE)
+
+kable(bootstrap_summary, digits = 3)
+```
+
+## Final comparison table
+```{r}
+final_comparison <- index_fit_tbl %>%
+  dplyr::rename(
+    in_sample_R2 = r.squared,
+    in_sample_adj_R2 = adj.r.squared,
+    in_sample_RMSE = sigma
+  ) %>%
+
+  dplyr::left_join(
+    cv_summary %>%
+      dplyr::select(
+        model,
+        CV_RMSE = mean_RMSE,
+        CV_R2 = mean_R2,
+        CV_correlation = mean_correlation
+      ),
+    by = "model"
+  ) %>%
+
+  dplyr::left_join(
+    index_correlations %>%
+      dplyr::rename(
+        outcome_pearson = pearson,
+        outcome_spearman = spearman
+      ),
+    by = "model"
+  ) %>%
+
+  dplyr::left_join(
+    bootstrap_summary %>%
+      dplyr::select(
+        model,
+        bootstrap_adj_R2 = mean_adj_r2,
+        bootstrap_RMSE = mean_RMSE,
+        estimate_low,
+        estimate_high
+      ),
+    by = "model"
+  ) %>%
+
+  dplyr::arrange(
+    CV_RMSE
+  )
+
+knitr::kable(
+  final_comparison,
+  digits = 3
+)
+```
+
