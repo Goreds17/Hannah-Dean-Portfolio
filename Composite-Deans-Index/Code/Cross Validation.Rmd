@@ -1,0 +1,113 @@
+---
+title: "Cross Validation"
+author: "Hannah Dean"
+date: "2026-07-24"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(readr)
+
+CDI_outcomes_2025_2026 <- read_csv(
+  "CDI_Full_Data_With_2025_2026_Outcomes.csv",
+  show_col_types = FALSE
+)
+```
+
+## 10-fold cross-validation
+
+```{r cross val}
+library(caret)
+library(dplyr)
+library(purrr)
+library(tibble)
+
+set.seed(123)
+
+#----------------------------------------
+# Outcomes
+#----------------------------------------
+
+outcomes <- c(
+  "pb_xRV100_2025",
+  "observed_RV100_2025",
+  "ERA_2025",
+  "SIERA_2025",
+  "xERA_2025",
+  "FIP_2025",
+  "xFIP_2025",
+  "RA9_Wins_2025",
+  "pb_xRV100_2026",
+  "SIERA_2026",
+  "xERA_2026",
+  "FIP_2026",
+  "xFIP_2026",
+  "ERA_2026"
+)
+
+#----------------------------------------
+# Cross-validation settings
+#----------------------------------------
+
+ctrl <- trainControl(
+  method = "repeatedcv",
+  number = 10,
+  repeats = 25
+)
+
+#----------------------------------------
+# Function
+#----------------------------------------
+
+cross_validate_model <- function(outcome){
+
+  model_data <-
+    CDI_outcomes_2025_2026 %>%
+    select(
+      all_of(outcome),
+      z_stuff,
+      z_command,
+      z_miss,
+      z_contact
+    ) %>%
+    na.omit()
+
+  fit <- train(
+    reformulate(
+      c(
+        "z_stuff",
+        "z_command",
+        "z_miss",
+        "z_contact"
+      ),
+      response = outcome
+    ),
+    data = model_data,
+    method = "lm",
+    trControl = ctrl,
+    metric = "RMSE"
+  )
+
+  tibble(
+    Outcome = outcome,
+    N = nrow(model_data),
+    RMSE = fit$results$RMSE,
+    Rsquared = fit$results$Rsquared,
+    MAE = fit$results$MAE
+  )
+
+}
+
+#----------------------------------------
+# Run every model
+#----------------------------------------
+
+cv_results <-
+  map_dfr(outcomes, cross_validate_model)
+
+cv_results
+```
+
+Cross-validation demonstrated that the CDI framework generalized well across multiple run-prevention metrics. The highest predictive performance was observed for the 2025 skill-based metrics, including xERA (R² = 0.715), SIERA (R² = 0.693), xFIP (R² = 0.567), FIP (R² = 0.508), and PitchBot xRV100 (R² = 0.533), indicating that the model maintained strong predictive accuracy on unseen data. Prediction accuracy was lower for traditional outcomes such as ERA (R² = 0.383) and RA9-Wins (R² = 0.162), which are influenced by contextual factors including defense, sequencing, and run support.
