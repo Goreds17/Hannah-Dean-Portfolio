@@ -1,0 +1,1152 @@
+---
+title: "CDI weight"
+author: "Hannah Dean"
+date: "2026-07-24"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(readr)
+
+CDI_outcomes_2025_2026 <- read_csv(
+  "CDI_Full_Data_With_2025_2026_Outcomes.csv",
+  show_col_types = FALSE
+)
+```
+
+## LM on 2025
+
+```{r}
+pitchbot <- lm(
+  pb_xRV100_2025 ~
+    z_stuff +
+    z_command +
+    z_miss +
+    z_contact,
+  data = CDI_outcomes_2025_2026
+)
+
+summary(pitchbot)
+```
+```{r delta run}
+delta_run <- lm(
+  observed_RV100_2025 ~
+    z_stuff +
+    z_command +
+    z_miss +
+    z_contact,
+  data = CDI_outcomes_2025_2026
+)
+
+summary(delta_run)
+```
+```{r era}
+era_lm <- lm(
+  ERA_2025 ~
+    z_stuff +
+    z_command +
+    z_miss +
+    z_contact,
+  data = CDI_outcomes_2025_2026
+)
+
+summary(era_lm)
+```
+
+
+```{r siera}
+siera_lm <- lm(
+  SIERA_2025 ~
+    z_stuff +
+    z_command +
+    z_miss +
+    z_contact,
+  data = CDI_outcomes_2025_2026
+)
+
+summary(siera_lm)
+```
+
+```{r xera}
+xera_lm <- lm(
+  xERA_2025 ~
+    z_stuff +
+    z_command +
+    z_miss +
+    z_contact,
+  data = CDI_outcomes_2025_2026
+)
+
+summary(xera_lm)
+```
+
+```{r fip}
+fip_lm <- lm(
+  FIP_2025 ~
+    z_stuff +
+    z_command +
+    z_miss +
+    z_contact,
+  data = CDI_outcomes_2025_2026
+)
+
+summary(fip_lm)
+```
+
+
+```{r xfip}
+xfip_lm <- lm(
+  xFIP_2025 ~
+    z_stuff +
+    z_command +
+    z_miss +
+    z_contact,
+  data = CDI_outcomes_2025_2026
+)
+
+summary(xfip_lm)
+```
+
+
+```{r ra9}
+ra9_lm <- lm(
+  RA9_Wins_2025 ~
+    z_stuff +
+    z_command +
+    z_miss +
+    z_contact,
+  data = CDI_outcomes_2025_2026
+)
+
+summary(ra9_lm)
+```
+```{r Table}
+library(knitr)
+
+validation_summary <- data.frame(
+  Target = c(
+    "PitchBot xRV100",
+    "Observed RV100",
+    "ERA",
+    "SIERA",
+    "xERA",
+    "FIP",
+    "xFIP",
+    "RA9-Wins"
+  ),
+  Adj_R2 = c(
+    0.529,
+    0.463,
+    0.374,
+    0.690,
+    0.709,
+    0.502,
+    0.562,
+    0.153
+  ),
+  Stuff = c(
+    "***",
+    "NS",
+    "NS",
+    "***",
+    ".",
+    ".",
+    "***",
+    "."
+  ),
+  Command = c(
+    "***",
+    "***",
+    "**",
+    "***",
+    "***",
+    "***",
+    "***",
+    "***"
+  ),
+  Miss = c(
+    "**",
+    "***",
+    "***",
+    "***",
+    "***",
+    "***",
+    "***",
+    "***"
+  ),
+  Contact = c(
+    "NS",
+    "***",
+    "***",
+    "***",
+    "***",
+    "***",
+    "***",
+    "***"
+  ),
+  Interpretation = c(
+    "Strong agreement with PitchBot pitch quality.",
+    "Explains observed run prevention.",
+    "Predicts traditional run prevention.",
+    "Best overall validation of pitcher skill.",
+    "Highest explanatory power for expected run prevention.",
+    "Strong relationship with defense-independent outcomes.",
+    "Strong validation of underlying pitcher talent.",
+    "Weak due to contextual factors."
+  )
+)
+
+kable(
+  validation_summary,
+  digits = 3,
+  align = c("l","c","c","c","c","c","l"),
+  caption = "Summary of CDI Validation Across 2025 Performance Metrics"
+)
+```
+
+## 2026 Correlation Analysis
+```{r corr}
+#==========================
+# Pearson Correlations
+#==========================
+
+with(CDI_outcomes_2025_2026,
+     cor.test(elite_index, pb_xRV100_2026,
+              method = "pearson"))
+
+with(CDI_outcomes_2025_2026,
+     cor.test(elite_index, SIERA_2026,
+              method = "pearson"))
+
+with(CDI_outcomes_2025_2026,
+     cor.test(elite_index, xERA_2026,
+              method = "pearson"))
+
+with(CDI_outcomes_2025_2026,
+     cor.test(elite_index, FIP_2026,
+              method = "pearson"))
+
+with(CDI_outcomes_2025_2026,
+     cor.test(elite_index, xFIP_2026,
+              method = "pearson"))
+
+with(CDI_outcomes_2025_2026,
+     cor.test(elite_index, ERA_2026,
+              method = "pearson"))
+
+with(CDI_outcomes_2025_2026,
+     cor.test(elite_index, RA9_Wins_2026,
+              method = "pearson"))
+
+
+#==========================
+# Spearman Correlations
+#==========================
+
+with(CDI_outcomes_2025_2026,
+     cor.test(elite_index, pb_xRV100_2026,
+              method = "spearman"))
+
+with(CDI_outcomes_2025_2026,
+     cor.test(elite_index, SIERA_2026,
+              method = "spearman"))
+
+with(CDI_outcomes_2025_2026,
+     cor.test(elite_index, xERA_2026,
+              method = "spearman"))
+
+with(CDI_outcomes_2025_2026,
+     cor.test(elite_index, FIP_2026,
+              method = "spearman"))
+
+with(CDI_outcomes_2025_2026,
+     cor.test(elite_index, xFIP_2026,
+              method = "spearman"))
+
+with(CDI_outcomes_2025_2026,
+     cor.test(elite_index, ERA_2026,
+              method = "spearman"))
+
+with(CDI_outcomes_2025_2026,
+     cor.test(elite_index, RA9_Wins_2026,
+              method = "spearman"))
+```
+
+```{r correlation table}
+library(dplyr)
+library(knitr)
+library(kableExtra)
+
+correlation_table_2026 <- tibble(
+  Outcome = c(
+    "PitchBot xRV100",
+    "SIERA",
+    "xERA",
+    "FIP",
+    "xFIP",
+    "ERA",
+    "RA9-Wins"
+  ),
+  
+  Pearson_r = c(
+    -0.4177878,
+    -0.3754648,
+    -0.2419265,
+    -0.1938009,
+    -0.2371050,
+    -0.1003004,
+     0.2035644
+  ),
+  
+  Pearson_p = c(
+    "< .001",
+    "< .001",
+    "< .001",
+    "< .001",
+    "< .001",
+    ".046",
+    "< .001"
+  ),
+  
+  Spearman_rho = c(
+    -0.4527731,
+    -0.4243326,
+    -0.4297641,
+    -0.3796724,
+    -0.3656159,
+    -0.3006206,
+     0.1947952
+  ),
+  
+  Spearman_p = c(
+    "< .001",
+    "< .001",
+    "< .001",
+    "< .001",
+    "< .001",
+    "< .001",
+    "< .001"
+  ),
+  
+  Interpretation = c(
+    "Strongest predictive relationship",
+    "Strong prediction of underlying skill",
+    "Moderate rank prediction",
+    "Modest linear, moderate rank relationship",
+    "Modest-to-moderate prediction",
+    "Weak linear, meaningful rank prediction",
+    "Small positive relationship with future value"
+  )
+)
+
+correlation_table_2026 %>%
+  mutate(
+    Pearson_r = round(Pearson_r, 3),
+    Spearman_rho = round(Spearman_rho, 3)
+  ) %>%
+  kable(
+    caption = "Predictive Validity of 2025 CDI for 2026 Pitching Outcomes",
+    col.names = c(
+      "2026 Outcome",
+      "Pearson r",
+      "Pearson p",
+      "Spearman rho",
+      "Spearman p",
+      "Interpretation"
+    ),
+    align = c("l", "c", "c", "c", "c", "l"),
+    booktabs = TRUE
+  ) %>%
+  kable_styling(
+    full_width = FALSE,
+    position = "center",
+    bootstrap_options = c("striped", "hover", "condensed")
+  )
+```
+
+
+## Linear Regression
+```{r 2026LR}
+
+# PitchBot expected run value
+lm_pb_xRV100_2026 <- lm(
+  pb_xRV100_2026 ~ elite_index,
+  data = CDI_outcomes_2025_2026
+)
+
+summary(lm_pb_xRV100_2026)
+
+
+# SIERA
+lm_SIERA_2026 <- lm(
+  SIERA_2026 ~ elite_index,
+  data = CDI_outcomes_2025_2026
+)
+
+summary(lm_SIERA_2026)
+
+
+# xERA
+lm_xERA_2026 <- lm(
+  xERA_2026 ~ elite_index,
+  data = CDI_outcomes_2025_2026
+)
+
+summary(lm_xERA_2026)
+
+
+# FIP
+lm_FIP_2026 <- lm(
+  FIP_2026 ~ elite_index,
+  data = CDI_outcomes_2025_2026
+)
+
+summary(lm_FIP_2026)
+
+
+# xFIP
+lm_xFIP_2026 <- lm(
+  xFIP_2026 ~ elite_index,
+  data = CDI_outcomes_2025_2026
+)
+
+summary(lm_xFIP_2026)
+
+
+# ERA
+lm_ERA_2026 <- lm(
+  ERA_2026 ~ elite_index,
+  data = CDI_outcomes_2025_2026
+)
+
+summary(lm_ERA_2026)
+
+
+# RA9-Wins
+lm_RA9_Wins_2026 <- lm(
+  RA9_Wins_2026 ~ elite_index,
+  data = CDI_outcomes_2025_2026
+)
+
+summary(lm_RA9_Wins_2026)
+```
+
+```{r LR table}
+library(dplyr)
+library(knitr)
+library(kableExtra)
+
+regression_table <- tibble(
+  Outcome = c(
+    "PitchBot xRV100",
+    "SIERA",
+    "xERA",
+    "xFIP",
+    "RA9-Wins",
+    "FIP",
+    "ERA"
+  ),
+
+  Beta = c(
+    -0.38639,
+    -0.59845,
+    -1.22830,
+    -0.63230,
+     0.36179,
+    -1.03850,
+    -1.34680
+  ),
+
+  Adj_R2 = c(
+    0.1725,
+    0.1388,
+    0.0561,
+    0.0538,
+    0.0390,
+    0.0351,
+    0.0076
+  ),
+
+  p_value = c(
+    "< .001",
+    "< .001",
+    "< .001",
+    "< .001",
+    "< .001",
+    "< .001",
+    ".046"
+  ),
+
+  Interpretation = c(
+    "Strongest predictive model",
+    "Strong prediction of future skill",
+    "Modest prediction",
+    "Modest prediction",
+    "Small positive relationship",
+    "Small but significant prediction",
+    "Weak prediction"
+  )
+)
+
+regression_table %>%
+  mutate(
+    Beta = round(Beta, 3),
+    Adj_R2 = round(Adj_R2, 3)
+  ) %>%
+  kable(
+    caption = "Simple Linear Regression Models Predicting 2026 Performance from the 2025 Composite Dominance Index (CDI)",
+    col.names = c(
+      "2026 Outcome",
+      expression(beta),
+      "Adjusted R²",
+      "p-value",
+      "Interpretation"
+    ),
+    align = c("l","c","c","c","l"),
+    booktabs = TRUE
+  ) %>%
+  kable_styling(
+    full_width = FALSE,
+    position = "center",
+    bootstrap_options = c("striped","hover","condensed")
+  )
+```
+
+
+## Multiple Linear Regression
+
+```{r 2026MLR}
+# PitchBot expected run value
+skills_pb_xRV100_2026 <- lm(
+  pb_xRV100_2026 ~ z_stuff + z_command + z_miss + z_contact,
+  data = CDI_outcomes_2025_2026
+)
+
+summary(skills_pb_xRV100_2026)
+
+
+# SIERA
+skills_SIERA_2026 <- lm(
+  SIERA_2026 ~ z_stuff + z_command + z_miss + z_contact,
+  data = CDI_outcomes_2025_2026
+)
+
+summary(skills_SIERA_2026)
+
+
+# xERA
+skills_xERA_2026 <- lm(
+  xERA_2026 ~ z_stuff + z_command + z_miss + z_contact,
+  data = CDI_outcomes_2025_2026
+)
+
+summary(skills_xERA_2026)
+
+
+# FIP
+skills_FIP_2026 <- lm(
+  FIP_2026 ~ z_stuff + z_command + z_miss + z_contact,
+  data = CDI_outcomes_2025_2026
+)
+
+summary(skills_FIP_2026)
+
+
+# xFIP
+skills_xFIP_2026 <- lm(
+  xFIP_2026 ~ z_stuff + z_command + z_miss + z_contact,
+  data = CDI_outcomes_2025_2026
+)
+
+summary(skills_xFIP_2026)
+
+
+# ERA
+skills_ERA_2026 <- lm(
+  ERA_2026 ~ z_stuff + z_command + z_miss + z_contact,
+  data = CDI_outcomes_2025_2026
+)
+
+summary(skills_ERA_2026)
+
+
+# RA9-Wins
+skills_RA9_Wins_2026 <- lm(
+  RA9_Wins_2026 ~ z_stuff + z_command + z_miss + z_contact,
+  data = CDI_outcomes_2025_2026
+)
+
+summary(skills_RA9_Wins_2026)
+```
+
+```{r rm table}
+library(knitr)
+
+validation_summary_2026 <- data.frame(
+  Target = c(
+    "PitchBot xRV100",
+    "SIERA",
+    "xERA",
+    "FIP",
+    "xFIP",
+    "ERA",
+    "RA9-Wins"
+  ),
+  Adj_R2 = c(
+    0.185,
+    0.160,
+    0.059,
+    0.035,
+    0.066,
+    0.005,
+    0.042
+  ),
+  Stuff = c(
+    "***",
+    "***",
+    "NS",
+    "NS",
+    "*",
+    "NS",
+    "NS"
+  ),
+  Command = c(
+    "***",
+    "NS",
+    "NS",
+    "NS",
+    "NS",
+    "NS",
+    "*"
+  ),
+  Miss = c(
+    "NS",
+    "**",
+    "**",
+    ".",
+    "*",
+    "NS",
+    "**"
+  ),
+  Contact = c(
+    "NS",
+    "NS",
+    "NS",
+    "NS",
+    "NS",
+    "NS",
+    "NS"
+  ),
+  Interpretation = c(
+    "Predicts future PitchBot pitch quality.",
+    "Best future run-prevention validation.",
+    "Limited prediction of future expected run prevention.",
+    "Weak prediction of future defense-independent outcomes.",
+    "Moderate prediction of future underlying talent.",
+    "Little ability to predict future ERA.",
+    "Modest prediction of future value."
+  )
+)
+
+kable(
+  validation_summary_2026,
+  digits = 3,
+  align = c("l","c","c","c","c","c","l"),
+  caption = "Summary of CDI Out-of-Sample Validation Across 2026 Performance Metrics"
+)
+```
+## VIF
+
+```{r vif all}
+library(car)
+library(dplyr)
+library(purrr)
+library(tibble)
+
+outcomes_2025 <- c(
+  "pb_xRV100_2025",
+  "observed_RV100_2025",
+  "ERA_2025",
+  "SIERA_2025",
+  "xERA_2025",
+  "FIP_2025",
+  "xFIP_2025",
+  "RA9_Wins_2025"
+)
+
+vif_summary <- map_dfr(outcomes_2025, function(outcome) {
+
+  model_formula <- as.formula(
+    paste(
+      outcome,
+      "~ z_stuff + z_command + z_miss + z_contact"
+    )
+  )
+
+  model <- lm(
+    model_formula,
+    data = CDI_outcomes_2025_2026
+  )
+
+  vif_values <- car::vif(model)
+
+  tibble(
+    Target = outcome,
+    Predictor = names(vif_values),
+    VIF = as.numeric(vif_values)
+  )
+})
+
+vif_summary
+```
+
+```{r vif tolerance}
+vif_results <- vif_summary %>%
+  mutate(
+    Tolerance = 1 / VIF
+  )
+
+vif_results
+```
+
+These results suggest that multicollinearity is not a concern, allowing each skill domain to contribute unique explanatory information to the regression models.
+
+## Residual Diagnostics
+
+```{r resid func}
+library(dplyr)
+library(purrr)
+library(tibble)
+library(lmtest)
+library(car)
+
+# Replace names here if your actual column names differ
+outcomes_2025 <- c(
+  "pb_xRV100_2025",
+  "observed_RV100_2025",
+  "ERA_2025",
+  "SIERA_2025",
+  "xERA_2025",
+  "FIP_2025",
+  "xFIP_2025",
+  "RA9_Wins_2025"
+)
+
+run_diagnostics <- function(outcome, data) {
+
+  model_formula <- reformulate(
+    termlabels = c(
+      "z_stuff",
+      "z_command",
+      "z_miss",
+      "z_contact"
+    ),
+    response = outcome
+  )
+
+  model <- lm(model_formula, data = data)
+
+  n <- nobs(model)
+  k <- length(coef(model))
+
+  bp <- lmtest::bptest(model)
+  shapiro <- shapiro.test(residuals(model))
+
+  cooks_d <- cooks.distance(model)
+  leverage <- hatvalues(model)
+  studentized <- rstudent(model)
+
+  tibble(
+    Outcome = outcome,
+    N = n,
+
+    Shapiro_W = unname(shapiro$statistic),
+    Shapiro_p = shapiro$p.value,
+
+    BP_Statistic = unname(bp$statistic),
+    BP_p = bp$p.value,
+
+    Max_Abs_Studentized_Residual =
+      max(abs(studentized), na.rm = TRUE),
+
+    Cases_Residual_GT_3 =
+      sum(abs(studentized) > 3, na.rm = TRUE),
+
+    Max_Leverage =
+      max(leverage, na.rm = TRUE),
+
+    Cases_High_Leverage =
+      sum(leverage > (2 * k / n), na.rm = TRUE),
+
+    Max_Cooks_D =
+      max(cooks_d, na.rm = TRUE),
+
+    Cases_Cooks_GT_4_over_N =
+      sum(cooks_d > (4 / n), na.rm = TRUE),
+
+    Cases_Cooks_GT_1 =
+      sum(cooks_d > 1, na.rm = TRUE)
+  )
+}
+
+diagnostic_summary_2025 <- map_dfr(
+  outcomes_2025,
+  run_diagnostics,
+  data = CDI_outcomes_2025_2026
+)
+
+diagnostic_summary_2025
+```
+
+The only assumption that isn't perfectly met is normality of the residuals, but that's expected with a large sample size (N = 474) and isn't a major concern for linear regression.
+
+- Normality: Not perfect (expected with N = 474), but generally not a concern.
+- Homoscedasticity: Mixed. About half of the models show constant variance, while others exhibit mild heteroscedasticity.
+- Outliers: Very few (4–7 observations with |studentized residual| > 3).
+- Influential observations: None. Cook's D never approaches 1, which is the more important criterion.
+
+
+```{r diagnostic plots}
+for (outcome in outcomes_2025) {
+
+  model_formula <- reformulate(
+    termlabels = c(
+      "z_stuff",
+      "z_command",
+      "z_miss",
+      "z_contact"
+    ),
+    response = outcome
+  )
+
+  model <- lm(
+    model_formula,
+    data = CDI_outcomes_2025_2026
+  )
+
+  par(mfrow = c(2, 2))
+
+  plot(
+    model,
+    main = outcome
+  )
+
+  par(mfrow = c(1, 1))
+}
+```
+
+## Testing the 5 subjects that stand out in Leverage
+```{r high lev}
+# Leverage values
+lev <- hatvalues(era_lm)
+
+# Top 10 highest leverage observations
+head(sort(lev, decreasing = TRUE), 10)
+```
+```{r high lev players}
+CDI_outcomes_2025_2026 %>%
+  mutate(
+    leverage = hatvalues(era_lm)
+  ) %>%
+  arrange(desc(leverage)) %>%
+  select(pitcher_name,
+         leverage,
+         z_stuff,
+         z_command,
+         z_miss,
+         z_contact,
+         ERA_2025) %>%
+  head(5)
+```
+
+```{r influence}
+CDI_outcomes_2025_2026 %>%
+  mutate(
+    leverage = hatvalues(era_lm),
+    cooks = cooks.distance(era_lm)
+  ) %>%
+  arrange(desc(cooks)) %>%
+  select(pitcher_name, leverage, cooks) %>%
+  head(5)
+```
+
+Five pitchers consistently exhibited elevated leverage values due to extreme combinations of the four CDI skill domains. These observations corresponded to legitimate pitcher profiles (e.g., submarine or otherwise atypical pitchers) rather than data errors. Although these pitchers occupied unusual regions of the predictor space, Cook's Distance values remained low (maximum = 0.033), indicating that no single observation exerted undue influence on the fitted regression models. Therefore, all observations were retained for analysis.
+
+
+## Bootstrap Coefficients
+```{r boot}
+library(boot)
+library(dplyr)
+library(purrr)
+library(tibble)
+
+# Outcomes to evaluate
+outcomes_2025 <- c(
+  "pb_xRV100_2025",
+  "observed_RV100_2025",
+  "ERA_2025",
+  "SIERA_2025",
+  "xERA_2025",
+  "FIP_2025",
+  "xFIP_2025",
+  "RA9_Wins_2025",
+  "pb_xRV100_2026",
+  "SIERA_2026",
+  "xERA_2026",
+  "FIP_2026",
+  "xFIP_2026",
+  "ERA_2026"
+)
+
+# Function that bootstraps one dependent outcome
+bootstrap_skill_model <- function(outcome, data, R = 10000) {
+
+  # Keep only complete cases for this specific model
+  model_data <- data %>%
+    select(
+      all_of(outcome),
+      z_stuff,
+      z_command,
+      z_miss,
+      z_contact
+    ) %>%
+    filter(complete.cases(.))
+
+  # Build regression formula
+  model_formula <- reformulate(
+    termlabels = c(
+      "z_stuff",
+      "z_command",
+      "z_miss",
+      "z_contact"
+    ),
+    response = outcome
+  )
+
+  # Statistic returned during each bootstrap sample
+  boot_statistic <- function(data, indices) {
+
+    sampled_data <- data[indices, ]
+
+    model <- lm(
+      model_formula,
+      data = sampled_data
+    )
+
+    coef(model)
+  }
+
+  set.seed(123)
+
+  boot_model <- boot(
+    data = model_data,
+    statistic = boot_statistic,
+    R = R
+  )
+
+  coefficient_names <- names(
+    coef(lm(model_formula, data = model_data))
+  )
+
+  # Extract percentile confidence intervals
+  results <- map_dfr(
+    seq_along(coefficient_names),
+    function(i) {
+
+      ci <- tryCatch(
+        boot.ci(
+          boot_model,
+          type = "perc",
+          index = i
+        ),
+        error = function(e) NULL
+      )
+
+      if (is.null(ci) || is.null(ci$percent)) {
+
+        lower_ci <- NA_real_
+        upper_ci <- NA_real_
+
+      } else {
+
+        lower_ci <- ci$percent[4]
+        upper_ci <- ci$percent[5]
+      }
+
+      tibble(
+        Outcome = outcome,
+        N = nrow(model_data),
+        Predictor = coefficient_names[i],
+        Estimate = boot_model$t0[i],
+        CI_Lower = lower_ci,
+        CI_Upper = upper_ci
+      )
+    }
+  )
+
+  results
+}
+
+# Run bootstrap for every outcome
+set.seed(123)
+
+bootstrap_results_2025 <- map_dfr(
+  outcomes_2025,
+  bootstrap_skill_model,
+  data = CDI_outcomes_2025_2026,
+  R = 10000
+)
+
+bootstrap_results_2025
+```
+
+```{r display}
+bootstrap_skills_2025_2026 <- bootstrap_results_2025 %>%
+  filter(Predictor != "(Intercept)") %>%
+  mutate(
+    across(
+      c(Estimate, CI_Lower, CI_Upper),
+      ~ round(.x, 3)
+    ),
+    Significant = case_when(
+      CI_Lower > 0 & CI_Upper > 0 ~ "Positive",
+      CI_Lower < 0 & CI_Upper < 0 ~ "Negative",
+      TRUE ~ "Includes zero"
+    )
+  )
+
+bootstrap_skills_2025_2026
+```
+
+```{r boot table}
+bootstrap_skills_2025_2026 %>%
+  filter(Significant != "Includes zero")
+
+bootstrap_skills_wide <- bootstrap_skills_2025_2026 %>%
+  mutate(
+    Estimate_CI = paste0(
+      Estimate,
+      " [",
+      CI_Lower,
+      ", ",
+      CI_Upper,
+      "]"
+    )
+  ) %>%
+  select(
+    Outcome,
+    Predictor,
+    Estimate_CI
+  ) %>%
+  tidyr::pivot_wider(
+    names_from = Predictor,
+    values_from = Estimate_CI
+  )
+
+bootstrap_skills_wide
+```
+
+
+Bootstrap confidence intervals largely confirmed the original regression results, indicating that the relationships between the CDI skill domains and run-prevention outcomes were stable under repeated resampling, with reduced precision observed only for a small number of weaker predictor-outcome combinations.
+
+```{r cdi weightness}
+
+# PitchBot expected run value
+lm_pb_xRV100_2025 <- lm(
+  pb_xRV100_2025 ~ elite_index,
+  data = CDI_outcomes_2025_2026
+)
+
+summary(lm_pb_xRV100_2025)
+
+
+# SIERA
+lm_SIERA_2025 <- lm(
+  SIERA_2025 ~ elite_index,
+  data = CDI_outcomes_2025_2026
+)
+
+summary(lm_SIERA_2025)
+
+
+# xERA
+lm_xERA_2025 <- lm(
+  xERA_2025 ~ elite_index,
+  data = CDI_outcomes_2025_2026
+)
+
+summary(lm_xERA_2025)
+
+
+# FIP
+lm_FIP_2025 <- lm(
+  FIP_2025 ~ elite_index,
+  data = CDI_outcomes_2025_2026
+)
+
+summary(lm_FIP_2025)
+
+
+# xFIP
+lm_xFIP_2025 <- lm(
+  xFIP_2025 ~ elite_index,
+  data = CDI_outcomes_2025_2026
+)
+
+summary(lm_xFIP_2025)
+
+
+# ERA
+lm_ERA_2025 <- lm(
+  ERA_2025 ~ elite_index,
+  data = CDI_outcomes_2025_2026
+)
+
+summary(lm_ERA_2025)
+
+
+# RA9-Wins
+lm_RA9_Wins_2025 <- lm(
+  RA9_Wins_2025 ~ elite_index,
+  data = CDI_outcomes_2025_2026
+)
+
+summary(lm_RA9_Wins_2025)
+```
+
+```{r 2025 corellation}
+#==========================
+# Pearson Correlations
+#==========================
+
+with(CDI_outcomes_2025_2026,
+     cor.test(elite_index, pb_xRV100_2025,
+              method = "pearson"))
+
+with(CDI_outcomes_2025_2026,
+     cor.test(elite_index, SIERA_2025,
+              method = "pearson"))
+
+with(CDI_outcomes_2025_2026,
+     cor.test(elite_index, xERA_2025,
+              method = "pearson"))
+
+with(CDI_outcomes_2025_2026,
+     cor.test(elite_index, FIP_2025,
+              method = "pearson"))
+
+with(CDI_outcomes_2025_2026,
+     cor.test(elite_index, xFIP_2025,
+              method = "pearson"))
+
+with(CDI_outcomes_2025_2026,
+     cor.test(elite_index, ERA_2025,
+              method = "pearson"))
+
+with(CDI_outcomes_2025_2026,
+     cor.test(elite_index, RA9_Wins_2025,
+              method = "pearson"))
+```
+
