@@ -1,6 +1,3 @@
-# Hannah-Dean-Portfolio
-Sports Analytics &amp; Data Science portfolio featuring baseball research, statistical modeling, machine learning, and data visualization.
-
 # Hannah Dean | Sports Analytics & Data Science
 
 Welcome to my portfolio! I am a Sports Analytics student with a minor in Data Science at California Baptist University, with a focus on baseball analytics, statistical modeling, machine learning, and player development.
