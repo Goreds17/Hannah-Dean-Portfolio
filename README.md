@@ -24,7 +24,7 @@ For additional project visuals, presentations, and detailed descriptions of my b
 
 **[Hannah Dean — Sports Analytics Portfolio](https://almondine-mouse-1e3.notion.site/Hannah-Dean-b7938f173b3283c8b3a7812d1bad53eb)**
 
-**[View My Resume](../Hannah%20Dean%20-%20Resume.pdf)**
+**[View My Resume](Hannah%20Dean%20-%20Resume.pdf)**
 
 ## Featured Projects
 
