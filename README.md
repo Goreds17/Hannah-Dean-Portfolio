@@ -65,9 +65,9 @@ This project explores how traditional qualitative scouting information can be in
 
 ---
 
-Pitch Strike Probability Modeling
+### Pitch Strike Probability Modeling
 
-Predictive Analytics | Logistic Regression | Baseball Analytics
+**Predictive Analytics | Logistic Regression | Baseball Analytics**
 
 Built a binary classification model to estimate strike probability using professional pitch-tracking data. Engineered pitch-call outcomes, evaluated pitch type, extension, and count context, and validated predictions on a held-out test set using classification metrics and ROC/AUC analysis.
 
