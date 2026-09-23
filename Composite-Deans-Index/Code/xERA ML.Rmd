@@ -1,0 +1,419 @@
+---
+title: "ML"
+author: "Hannah Dean"
+date: "2026-07-24"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(readr)
+#Data Set upload
+CDI_2025_table <- read_csv("CDI_2025_table.csv")
+
+CDI_2026_table <- read_csv("CDI_2026_table.csv")
+
+outcome_table <- read_csv("outcome_table.csv")
+
+CDI_ML_2025_2026 <- read_csv("CDI_ML_2025_2026.csv")
+
+```
+
+```{r libraries}
+
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(tidymodels)
+library(broom)
+
+tidymodels_prefer()
+set.seed(123)
+
+```
+
+```{r ml datasets}
+ml_2025 <- CDI_ML_2025_2026 %>%
+  transmute(
+    pitcher,
+    pitcher_name,
+    CDI = CDI_2025,
+    xERA = xERA_2025
+  ) %>%
+  filter(
+    is.finite(CDI),
+    is.finite(xERA)
+  )
+
+ml_2026 <- CDI_ML_2025_2026 %>%
+  transmute(
+    pitcher,
+    pitcher_name,
+    CDI = CDI_2026,
+    xERA = xERA_2026
+  ) %>%
+  filter(
+    is.finite(CDI),
+    is.finite(xERA)
+  )
+```
+
+
+## Linear Relationship between CDI-xERA
+
+```{r lr 2025}
+library(ggplot2)
+
+ggplot(
+  ml_2025,
+  aes(
+    x = CDI,
+    y = xERA
+  )
+) +
+  geom_point(
+    alpha = 0.65,
+    color = "steelblue",
+    size = 2
+  ) +
+  geom_smooth(
+    method = "lm",
+    formula = y ~ x,
+    color = "red",
+    fill = "pink",
+    linewidth = 1
+  ) +
+  labs(
+    title = "2025 CDI vs. xERA",
+    subtitle = "Relationship between Composite Development Index and Expected ERA",
+    x = "Composite Development Index (CDI)",
+    y = "Expected ERA (xERA)"
+  ) +
+  theme_minimal(base_size = 14)
+```
+
+```{r Pearson 2025}
+cor(
+  ml_2025$CDI,
+  ml_2025$xERA,
+  use = "complete.obs",
+  method = "pearson"
+)
+```
+
+```{r Spearman 2025}
+cor(
+  ml_2025$CDI,
+  ml_2025$xERA,
+  use = "complete.obs",
+  method = "spearman"
+)
+```
+# Repeated Cross Validation Folds
+```{r repeated folds}
+set.seed(123)
+
+cv_folds_2025 <- vfold_cv(
+  ml_2025,
+  v = 10,
+  repeats = 10,
+  strata = xERA
+)
+
+cv_folds_2025
+
+```
+
+
+## Pre Processing
+```{r prepro}
+cdi_recipe <- recipe(
+  xERA ~ CDI,
+  data = ml_2025
+) %>%
+  step_zv(all_predictors())
+
+```
+
+## Baseline Linear Model
+```{r Baseline}
+linear_spec <- linear_reg() %>%
+  set_engine("lm")
+
+linear_workflow <- workflow() %>%
+  add_recipe(cdi_recipe) %>%
+  add_model(linear_spec)
+
+```
+
+
+## Cross-validation
+```{r cross val}
+set.seed(123)
+
+linear_cv_results <- fit_resamples(
+  linear_workflow,
+  resamples = cv_folds_2025,
+  metrics = metric_set(
+    rmse,
+    mae,
+    rsq
+  ),
+  control = control_resamples(
+    save_pred = TRUE
+  )
+)
+
+collect_metrics(linear_cv_results)
+
+```
+
+## Examine Cross Validated Predictions
+```{r linear cv predictions}
+linear_cv_predictions <- collect_predictions(
+  linear_cv_results
+)
+
+head(linear_cv_predictions)
+
+```
+
+```{r linear cv plot}
+ggplot(
+  linear_cv_predictions,
+  aes(x = .pred, y = xERA)
+) +
+  geom_point(alpha = 0.45) +
+  geom_abline(
+    intercept = 0,
+    slope = 1,
+    linetype = "dashed"
+  ) +
+  geom_smooth(
+    method = "lm",
+    formula = y ~ x,
+    se = TRUE
+  ) +
+  labs(
+    title = "Cross-Validated 2025 CDI Model",
+    subtitle = "Predicted versus actual 2025 xERA",
+    x = "Predicted xERA",
+    y = "Actual xERA"
+  ) +
+  theme_minimal(base_size = 13)
+
+
+```
+
+## Fit & Freeze Final Model
+
+```{r fit}
+final_linear_model <- fit(
+  linear_workflow,
+  data = ml_2025
+)
+final_linear_model
+```
+
+```{r extract coes}
+linear_coefficients <- final_linear_model %>%
+  extract_fit_parsnip() %>%
+  tidy()
+
+linear_coefficients
+
+```
+
+
+
+```{r model glance}
+linear_model_glance <- final_linear_model %>%
+  extract_fit_parsnip() %>%
+  glance()
+
+linear_model_glance
+
+```
+
+$$\hat{\mathrm{xERA}} = 4.128 - 1.107(\mathrm{CDI})$$
+
+## Apply to 2026 CDI
+```{r test cdi}
+predictions_2026 <- predict(
+  final_linear_model,
+  new_data = ml_2026
+) %>%
+  bind_cols(ml_2026) %>%
+  rename(
+    predicted_xERA_2026 = .pred,
+    actual_xERA_2026 = xERA,
+    CDI_2026 = CDI
+  ) %>%
+  mutate(
+    residual = actual_xERA_2026 - predicted_xERA_2026,
+    absolute_error = abs(residual),
+    squared_error = residual^2
+  )
+
+```
+
+```{r results 2026}
+predictions_2026 %>%
+  arrange(absolute_error) %>%
+  head(20)
+
+```
+
+
+$$\text{Residual} = \text{Actual xERA} - \text{Predicted xERA}$$
+
+## Evaluate on actual 2026 xERA
+```{r evaluate}
+test_metrics_2026 <- predictions_2026 %>%
+  metrics(
+    truth = actual_xERA_2026,
+    estimate = predicted_xERA_2026
+  )
+
+test_metrics_2026
+
+```
+```{r evaluate 2}
+predictive_r2_2026 <- 1 -
+  sum(
+    (predictions_2026$actual_xERA_2026 -
+       predictions_2026$predicted_xERA_2026)^2
+  ) /
+  sum(
+    (predictions_2026$actual_xERA_2026 -
+       mean(predictions_2026$actual_xERA_2026))^2
+  )
+
+predictive_r2_2026
+
+```
+## Actual vs Predicted Plot
+```{r A vs P Plot}
+ggplot(
+  predictions_2026,
+  aes(
+    x = predicted_xERA_2026,
+    y = actual_xERA_2026
+  )
+) +
+  geom_point(alpha = 0.65) +
+  geom_abline(
+    intercept = 0,
+    slope = 1,
+    linetype = "dashed"
+  ) +
+  geom_smooth(
+    method = "lm",
+    formula = y ~ x,
+    se = TRUE
+  ) +
+  labs(
+    title = "Out-of-Season Validation of CDI",
+    subtitle = paste0(
+      "Model trained on 2025 and evaluated on 2026; R² = ",
+      round(predictive_r2_2026, 3)
+    ),
+    x = "Predicted 2026 xERA",
+    y = "Actual 2026 xERA"
+  ) +
+  theme_minimal(base_size = 13)
+```
+
+## Test Calibration
+```{r calibration}
+calibration_2026 <- lm(
+  actual_xERA_2026 ~ predicted_xERA_2026,
+  data = predictions_2026
+)
+
+summary(calibration_2026)
+tidy(calibration_2026)
+
+```
+
+```{r prediction bias}
+predictions_2026 %>%
+  summarise(
+    mean_actual = mean(actual_xERA_2026),
+    mean_predicted = mean(predicted_xERA_2026),
+    mean_error = mean(
+      predicted_xERA_2026 - actual_xERA_2026
+    )
+  )
+
+```
+
+## Comparison Against Simple Baseline
+
+```{r base}
+baseline_xERA_2025 <- mean(
+  ml_2025$xERA,
+  na.rm = TRUE
+)
+
+baseline_results_2026 <- ml_2026 %>%
+  mutate(
+    baseline_prediction = baseline_xERA_2025
+  ) %>%
+  summarise(
+    RMSE = sqrt(
+      mean(
+        (xERA - baseline_prediction)^2,
+        na.rm = TRUE
+      )
+    ),
+    MAE = mean(
+      abs(xERA - baseline_prediction),
+      na.rm = TRUE
+    )
+  )
+baseline_results_2026
+```
+
+```{r base 2}
+
+cdi_results_2026 <- predictions_2026 %>%
+  summarise(
+    RMSE = sqrt(
+      mean(
+        (actual_xERA_2026 - predicted_xERA_2026)^2
+      )
+    ),
+    MAE = mean(
+      abs(actual_xERA_2026 - predicted_xERA_2026)
+    )
+  )
+
+model_comparison <- bind_rows(
+  Baseline = baseline_results_2026,
+  CDI_Model = cdi_results_2026,
+  .id = "Model"
+)
+model_comparison
+```
+
+## Largest Prediction Misses
+```{r misses}
+largest_errors_2026 <- predictions_2026 %>%
+  arrange(desc(absolute_error)) %>%
+  select(
+    pitcher,
+    pitcher_name,
+    CDI_2026,
+    predicted_xERA_2026,
+    actual_xERA_2026,
+    residual,
+    absolute_error
+  ) %>%
+  slice_head(n = 20)
+
+largest_errors_2026
+
+```
+
