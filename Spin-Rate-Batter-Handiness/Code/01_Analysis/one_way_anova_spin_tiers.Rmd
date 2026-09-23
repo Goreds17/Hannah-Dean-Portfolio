@@ -1,0 +1,545 @@
+---
+title: "Project 2"
+author: "Hannah Dean"
+date: "2025-10-24"
+output:
+  word_document:
+    toc: true
+    toc_depth: '3'
+  html_document:
+    theme:
+      version: 5
+      bootswatch: cosmo
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    number_sections: true
+    code_folding: hide
+    df_print: paged
+    fig_caption: true
+    highlight: tango
+    smooth_scroll: true
+editor_options:
+  markdown:
+    wrap: 72
+knitr:
+  opts_chunk:
+    echo: false
+    message: false
+    warning: false
+---
+
+## Design & Simulation
+
+#### Topic & Rationale
+
+Spin Rate Tiers Effect on Exit Velocity
+
+Does exit velocity differ across spin rater tiers (Low, Medium, High)
+and between batter handedness (Left vs Right)? Does the effect of spin
+rate on exit velocity depend on batter handiness?
+
+Main Effect Spin Rate Tier
+
+-   **H₀₁:** \$ \mu\*{Low} =\* \mu{Med} = \mu\_{High} \$\
+    Exit velocity does not differ across spin-rate tiers.\
+-   **H₁₁:** At least one tier mean differs (\$ \mu\_i \ne \mu\_j \$ for
+    some *i*, *j*).\
+    Spin rate tier has a significant effect on exit velocity.
+
+Main Effect Batter Handiness
+
+-   **H₀₂:** \$ \mu\*{Left} =\* \mu{Right} \$\
+    Batter handedness does not influence exit velocity.\
+-   **H₁₂:** \$ \mu\*{Left}\* \ne \mu{Right} \$\
+    Left- and right-handed hitters differ in average exit velocity.
+
+Internationale Effect (Spin Rate Tiers x Batter Handiness)
+
+-   **H₀₃:** There is no interaction between spin-rate tier and batter
+    handedness.\
+    The effect of spin rate on exit velocity is the same for both left-
+    and right-handed batters.\
+-   **H₁₃:** There is a significant interaction.\
+    The relationship between spin rate and exit velocity changes
+    depending on batter handedness.
+
+#### Factor Definition
+
+Factor A: (Spin Rate Tiers) by Quantile • Low SR • Medium SR • High SR
+
+Factor B: (Batter Handiness) • Left • Right
+
+All 6 treatments: LSRleft, LSRright, MSRleft, MSRright, HSRleft,
+HSRright
+
+#### Data Construction
+
+```{r Data Construction}
+# ---- Packages ----
+library(vroom)
+library(dplyr)
+library(stringr)
+library(lubridate)
+library(purrr)
+library(tibble)
+library(readr)
+library(tidyr)
+library(multcomp)
+library(ggplot2)
+
+# "C:\Users\hanna\OneDrive\Documents\Pionneer League Games 2025"
+#"C:\\Users\\hanna\\OneDrive\\Documents\\Pioneer League Games 2025"
+
+# ---- Find all official games in "Pioneer League Games 2025" File ----
+#base_dir <- (choose.dir(caption = "Select the 'Pioneer League Games 2025' folder"))
+
+base_dir <- ("C:\\Users\\hanna\\OneDrive\\Documents\\Pionneer League Games 2025")
+
+list_official_csvs <- function(base_dir, strict_structure = TRUE) {
+  all_csvs <- list.files(base_dir, pattern = "\\.csv$", recursive = TRUE, full.names = TRUE, ignore.case = TRUE)
+  cat("Total .csv found (anywhere under base):", length(all_csvs), "\n")
+  
+  # Must be inside .../(5..9 or 05..09)/(day)/CSV/...
+  if (strict_structure) {
+    under_csv <- grepl("[/\\\\](0?[5-9])[/\\\\]\\d{1,2}[/\\\\]CSV[/\\\\]", all_csvs, ignore.case = TRUE)
+  } else {
+    # Relaxed: anywhere there is a CSV folder in the path
+    under_csv <- grepl("[/\\\\]CSV[/\\\\]", all_csvs, ignore.case = TRUE)
+  }
+  cat("…in CSV folders with month/day structure:", sum(under_csv), "\n")
+  
+  # Official filename: YYYYMMDD-Field-Game#.csv  (case-insensitive)
+  fname <- basename(all_csvs)
+  looks_official <- grepl("^\\d{8}-[^-]+-\\d+\\.csv$", fname, ignore.case = TRUE)
+  cat("…matching official filename pattern:", sum(looks_official), "\n")
+  
+  # Exclude any *_unverified* variants in "CSV" folder
+  not_unverified <- !grepl("_unverified", fname, ignore.case = TRUE)
+  cat("…excluding _unverified:", sum(not_unverified), "\n")
+  
+  keep <- under_csv & looks_official & not_unverified
+  files <- sort(all_csvs[keep])
+  cat("Official files kept:", length(files), "\n")
+  
+  if (length(files) == 0) {
+    cat("\nNo matches. Quick hints:\n",
+        "- Check that month folders are 5..9 or 05..09.\n",
+        "- Ensure there is a 'CSV' folder (exact name, any case) at the 3rd level.\n",
+        "- Confirm filenames look like 20250902-DehlerPark-1.csv (no spaces, hyphens exactly).\n",
+        "- If your structure differs, set strict_structure = FALSE.\n", sep = "")
+  }
+  files
+}
+
+# ---- Run the finder ----
+official_files <- list_official_csvs(base_dir, strict_structure = TRUE)
+# If you get 0, try relaxed search:
+if (length(official_files) == 0) {
+  cat("\nRetrying with relaxed structure (any 'CSV' folder)…\n")
+  official_files <- list_official_csvs(base_dir, strict_structure = FALSE)
+}
+
+# ---- Balls in Play ----
+# We just want rows where there is a ball in play so create new spreadsheet with 
+# value: "InPlay" in variable:"PitchCall"
+
+pbl_official <- vroom::vroom(
+  official_files,
+  .name_repair = "unique",
+  altrep = TRUE,
+  id = "source_file",
+  progress = TRUE
+) %>%
+  mutate(
+    file_name     = basename(source_file),
+    game_date_chr = str_match(file_name, "^(\\d{8})-")[,2],
+    field         = str_match(file_name, "^\\d{8}-([^-]+)-\\d+\\.csv$")[,2],
+    game_no       = suppressWarnings(as.integer(str_match(file_name, "-(\\d+)\\.csv$")[,2])),
+    game_date     = suppressWarnings(lubridate::ymd(game_date_chr))
+  ) %>%
+  dplyr::select(source_file, file_name, game_date, field, game_no, dplyr::everything())
+
+
+# column grabber for "PitchCall"
+col_like <- function(df, target) {
+  nm <- names(df)
+  hit <- which(tolower(gsub("\\s+", "", nm)) == tolower(gsub("\\s+", "", target)))
+  if (length(hit) == 0) return(NA_character_)
+  nm[hit[1]]
+}
+pc_col <- col_like(pbl_official, "PitchCall")
+if (is.na(pc_col)) stop("Couldn't find a 'PitchCall' column in pbl_official.")
+
+# Filter InPlay and write CSV
+out_dir <- file.path(base_dir, "Outputs")
+if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
+
+all_inplay <- pbl_official %>%
+  filter(!is.na(.data[[pc_col]])) %>%
+  mutate(!!pc_col := trimws(.data[[pc_col]])) %>%
+  filter(.data[[pc_col]] == "InPlay")
+
+out_path <- file.path(out_dir, "PioneerLeague_InPlay_AllRows.csv")
+readr::write_csv(all_inplay, out_path)
+
+cat("Saved", nrow(all_inplay), "rows to:\n", out_path, "\n")
+
+# ---- Edited Variables ----
+# Edit Data so it only has Variables needed for research
+
+# Required Variables
+required <- c(
+  "BatterSide","PitcherThrows","SpinRate","AutoPitchType","ExitSpeed","Angle",
+  "RelSpeed","ZoneSpeed","PlateLocHeight","PlateLocSide","AutoHitType",
+  "Direction","HitSpinRate"
+)
+
+# Make the trimmed tibble in memory
+stopifnot(exists("all_inplay"))
+missing <- setdiff(required, names(all_inplay))
+if (length(missing)) stop(paste("Missing columns in `all_inplay`:", paste(missing, collapse=", ")))
+
+inplay_var <- dplyr::select(all_inplay, all_of(required))
+
+# Quick peek
+glimpse(inplay_var)
+nrow(inplay_var); ncol(inplay_var); names(inplay_var)
+
+# (Optional) Save it too
+out_dir <- file.path(base_dir, "Outputs")
+if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
+out_path <- file.path(out_dir, "PioneerLeague_InPlay_SelectedCols_STRICT.csv")
+write_csv(inplay_var, out_path)
+cat("Saved:", out_path, "\n")
+
+# ---- Delete NA's ----
+# Get rid of rows with NA's
+
+inplay_var_clean <- inplay_var %>%
+  # 1) Trim and convert "" -> NA ONLY for character columns
+  mutate(across(where(is.character), ~ na_if(trimws(.), ""))) %>%
+  # 2) (Optional) Parse obvious numeric columns that might have come in as text
+  mutate(across(c(SpinRate, ExitSpeed, Angle, RelSpeed, ZoneSpeed,
+                  PlateLocHeight, PlateLocSide, HitSpinRate, Direction),
+                ~ suppressWarnings(as.numeric(.)), .names = "{.col}")) %>%
+  # 3) Drop rows with any NA in any column
+  drop_na()
+
+# Quick sanity check + save
+removed <- nrow(inplay_var) - nrow(inplay_var_clean)
+cat("Rows before:", nrow(inplay_var),
+    " | after:", nrow(inplay_var_clean),
+    " | removed:", removed, "\n")
+
+out_dir <- file.path(base_dir, "Outputs")
+if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
+out_path <- file.path(out_dir, "PioneerLeague_InPlay_SelectedCols_STRICT_noNA.csv")
+write_csv(inplay_var_clean, out_path)
+cat("Saved cleaned file to:\n", out_path, "\n")
+
+# ---- Spin tirers & Handiness ----
+stopifnot(exists("inplay_var_clean"))
+
+df <- inplay_var_clean %>%
+  filter(!is.na(SpinRate), !is.na(ExitSpeed), !is.na(BatterSide)) %>%
+  mutate(
+    SpinTier = cut(
+      SpinRate,
+      breaks = quantile(SpinRate, probs = c(0, 1/3, 2/3, 1), na.rm = TRUE),
+      labels = c("Low", "Medium", "High"),
+      include.lowest = TRUE
+    ),
+    BatterSide = case_when(
+      grepl("^l|left",  tolower(BatterSide)) ~ "Left",
+      grepl("^r|right", tolower(BatterSide)) ~ "Right",
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  filter(!is.na(BatterSide)) %>%
+  mutate(
+    SpinTier   = factor(SpinTier, levels = c("Low","Medium","High")),
+    BatterSide = factor(BatterSide, levels = c("Left","Right")),
+    Combo = interaction(SpinTier, BatterSide, sep = "_")   # 6 combined groups
+  ) %>%
+  droplevels()
+
+# ---- Tibble Table ----
+summary_tibble <- df %>%
+  count(SpinTier, BatterSide) %>%
+  pivot_wider(
+    names_from = SpinTier,
+    values_from = n,
+    values_fill = 0
+  ) %>%
+  rename(
+    Batter_Side = BatterSide
+  ) %>%
+  arrange(Batter_Side)
+
+# Print nicely
+summary_tibble
+```
+
+## Parameter Estimation
+
+#### Model Fitting & Output
+
+```{r Model Fit Statistics}
+lm1  <- lm(ExitSpeed ~ Combo, data = df)
+summary(lm1)
+```
+
+No single groups mean Exit Velocity differs significantly Residual
+standard error is 13.5 mph which is a big error for exit velocity
+meaning there inst much variation R\^2 is equal to .06% meaning that
+only .06%is explained by the different groups The F-statistic shows us
+that there may be some differences between the groups exit velocity but
+there aren't any strong and significant differences that are meaningful
+
+```{r ANOVA Table}
+fit1 <- aov(ExitSpeed ~ Combo, data = df)
+summary(fit1)
+```
+
+Sum of Squares also shows us that the variables explain a tiny fraction
+of the total variation The P value of the F statistic shows that there
+is a statistically significant effect on at least one of the groups
+However, despite statistical significance the effect size is very small
+and effects .1% of the variation in Exit Velocity
+
+#### Parameter Interpertation
+
+$$
+Y_{ij} = \mu + \alpha_i + \epsilon_{ij}
+$$ where\
+- $Y_{ij}$: Exit velocity for the *jth* observation in group *i*\
+- $\mu$: Overall (grand) mean\
+- $\alpha_i$: Effect of the *ith* Combo group (deviation from grand
+mean)\
+- $\epsilon_{ij}$: Random error term, assumed $\sim N(0, \sigma^2)$
+
+$$
+ExitSpeed_{ij} = \mu + \alpha_{\text{Combo}_i} + \epsilon_{ij}
+$$
+
+#### Group Summary Table
+
+```{r Mean & SDs}
+group_summary <- df %>%
+  group_by(Combo) %>%
+  summarise(
+    n = n(),
+    mean_ES = mean(ExitSpeed),
+    sd_ES = sd(ExitSpeed),
+    .groups = "drop"
+  )
+print(group_summary)
+
+overall_mean <- mean(df$ExitSpeed)
+alpha_hats <- group_summary %>%
+  mutate(alpha_hat = mean_ES - overall_mean)
+
+print(alpha_hats)
+```
+
+The mean Exit Speed is around 89mph for each group with a standard
+deviation of 12-14 mph which are larger standards of deviation for the
+data set, The low_right group had the largest exit velocity of 89.95 mph
+The high_left group had the lowest exit velocity of 88.84 mph So the
+range between the lowest and the largest exit velocity is 1.1mph which
+is a difference but it is not a ver big difference in terms of the
+context
+
+#### ANOVA Table & Hypotheses
+
+F-Stat: F(5, 19892) = 2.44 P-Value: .032 Significance level: .05
+
+#### F-test Interpertation
+
+since p = .032 \< .05, we reject the null hypothesis meaning that there
+is a significant difference in mean Exit Velocity among the groups.
+
+That being said the statistically significant differences is very small
+roughly 1mph and it isn't very meaningful in terms of the context and
+the groups have a negligible influence on Exit Velocity.
+
+## Contrasts & Post-Hoc Test
+
+```{r Contrast Prep}
+# Contrast Matrix
+K_combo <- rbind(
+  # High vs (Low+Med)/2 within each side
+  High_vs_Others_Left  = c( Low_Left = -0.5, Medium_Left = -0.5, High_Left = 1,
+                            Low_Right = 0,   Medium_Right = 0,   High_Right = 0 ),
+  High_vs_Others_Right = c( Low_Left = 0,   Medium_Left = 0,   High_Left = 0,
+                            Low_Right = -0.5, Medium_Right = -0.5, High_Right = 1 ),
+
+  # Low vs Medium within each side
+  Low_vs_Med_Left  = c( Low_Left = 1,  Medium_Left = -1, High_Left = 0,
+                        Low_Right = 0, Medium_Right = 0,  High_Right = 0 ),
+  Low_vs_Med_Right = c( Low_Left = 0, Medium_Left = 0,  High_Left = 0,
+                        Low_Right = 1, Medium_Right = -1, High_Right = 0 ),
+
+  # Left vs Right within each spin tier
+  Left_vs_Right_Low   = c( Low_Left = -1, Medium_Left = 0, High_Left = 0,
+                           Low_Right = 1,  Medium_Right = 0, High_Right = 0 ),
+  Left_vs_Right_Med   = c( Low_Left = 0, Medium_Left = -1, High_Left = 0,
+                           Low_Right = 0,  Medium_Right = 1,  High_Right = 0 ),
+  Left_vs_Right_High  = c( Low_Left = 0, Medium_Left = 0, High_Left = -1,
+                           Low_Right = 0,  Medium_Right = 0, High_Right = 1 )
+)
+
+
+# ---- Contrasts ----
+# Add the two contrasts
+K_combo <- rbind(
+  K_combo,
+
+  # C1: High spin (avg of High_Left, High_Right) vs Low spin (avg of Low_Left, Low_Right)
+  High_vs_Low_All = c(
+    Low_Left = -0.5, Medium_Left = 0, High_Left = 0.5,
+    Low_Right = -0.5, Medium_Right = 0, High_Right = 0.5
+  ),
+
+  # C2: Left vs Right (averaging across Low/Med/High)
+  Left_vs_Right_All = c(
+    Low_Left = 1/3,  Medium_Left = 1/3,  High_Left = 1/3,
+    Low_Right = -1/3, Medium_Right = -1/3, High_Right = -1/3
+  )
+)
+```
+
+#### Contrast Definition
+
+High Spin vs Low Spin
+
+$$
+C_1 = \frac{1}{2}(\mu_{\text{High\_Left}} + \mu_{\text{High\_Right}}) 
+    - \frac{1}{2}(\mu_{\text{Low\_Left}} + \mu_{\text{Low\_Right}})
+$$
+
+Left vs Right Handed batters
+
+$$
+C_2 = \frac{1}{3}(\mu_{\text{Low\_Left}} + \mu_{\text{Medium\_Left}} + \mu_{\text{High\_Left}})
+    - \frac{1}{3}(\mu_{\text{Low\_Right}} + \mu_{\text{Medium\_Right}} + \mu_{\text{High\_Right}})
+$$
+
+#### Unadjusted Comparison
+
+```{r Contrast Definition}
+summary(multcomp::glht(lm1, linfct = mcp(Combo = K_combo)), test = adjusted("none"))
+```
+
+Statistical Significance: (3 contrasts had significance) -
+High_vs_Others_Laeft (p = .023) - High_vs_Low_All (p = .040) -
+Left_vs_Right_All (p= .041)
+
+High Spin means slightly lower Exit Velocity (.5-.8 mph) Right sided
+batters have slightly higher Exit Velocity (.4 mph)
+
+#### Bonferroni Adjustment
+
+```{r Bonferroni Comparison}
+summary(multcomp::glht(lm1, linfct = mcp(Combo = K_combo)), test = adjusted("bonferroni"))
+```
+
+Bonferroni Correction - controls the rate of false positives when
+performing multiple hypothesis tests on the same dataset
+
+After applying the Bonferroni Correction for multiple comparisons, we
+see that none of the contrasts measured are statistically significant.
+
+Therefore we fail to reject the null hypotheses that any of the
+contrasts effect Exit Velocity after accounting for multiple testing in
+the Bonferroni Correction
+
+#### Holm Adjustment
+
+```{r Holm Adjustment}
+summary(multcomp::glht(lm1, linfct = mcp(Combo = K_combo)), test = adjusted("holm"))
+```
+
+Holm Correction - Controls family-wise error rate while being less
+conservative and thus allowing for more statistical rejections.
+
+After applying the Holm Correction for multiple comparisons, we see that
+none of the contrasts measured are statistically significant.
+
+Therefore we fail to reject the null hypotheses that any of the
+contrasts effect Exit Velocity once the family-wise error was controlled
+in the Holm Correction
+
+#### Tukey's HSD
+
+```{r Tukeys HSD}
+fit_combo <- aov(ExitSpeed ~ Combo, data = df)
+TukeyHSD(fit_combo)
+```
+
+Tukey's Honestly Significant Difference Test - is a Post-HOC test that
+creates confidence intervals for all pairwise comparisons & controls for
+the type 1 error rate to make sure that the differences are truly
+significant.
+
+The Tukey HSD test shows us that one pairwise comparison is
+statistically significant (Low_Right & High_Left) which had a p value of
+.022 and Low_Right having a mean difference of 1.10 mph more than
+High_Left.
+
+#### Synthesis/Discussion
+
+While a few contrasts reached nominal significance before adjustment,
+the magnitude of all observed effects was very small (\< 1 mph). Given
+the large sample size (\~20,000 observations) and high within-group
+variability (\~13 mph SD), these differences are statistically
+detectable but not practically meaningful. Taken together, the contrast
+and post-hoc results suggest that Combos have no substantial influence
+on Exit velocity, and any minor variations are likely due to random
+variation rather than true performance differences.
+
+## Visualization
+
+#### Boxplot/Stripchart
+
+```{r Boxplot}
+df$Combo <- factor(
+  df$Combo,
+  levels = c("Low_Left","Medium_Left","High_Left","Low_Right","Medium_Right","High_Right")
+)
+
+ggplot(df, aes(Combo, ExitSpeed, fill = Combo)) +
+  geom_boxplot(alpha = 0.7, width = 0.7, outlier.shape = NA) +
+  # (optional) stripchart look:
+  geom_jitter(width = 0.15, alpha = 0.25, size = 1.3) +
+  labs(title = "Exit Velocity by Combined Group (Spin Tier × Batter Side)",
+       x = "Spin Tier × Batter Side", y = "Exit Velocity (mph)") +
+  theme_minimal(base_size = 13) +
+  theme(axis.text.x = element_text(angle = 20, hjust = 1)) +
+  guides(fill = "none")
+```
+
+#### Mean +\_ SE Plot
+
+```{r Mean SE Plot}
+sumdat_combo <- df %>%
+  group_by(Combo) %>%
+  summarise(
+    mean = mean(ExitSpeed),
+    se   = sd(ExitSpeed)/sqrt(n()),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    Combo = factor(Combo, levels = c("Low_Left","Medium_Left","High_Left",
+                                     "Low_Right","Medium_Right","High_Right"))
+  )
+
+ggplot(sumdat_combo, aes(Combo, mean)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean - se, ymax = mean + se), width = 0.15) +
+  labs(title = "Mean ± SE of Exit Velocity (6 Combined Groups)",
+       x = "Spin Tier × Batter Side", y = "Mean Exit Velocity (mph)") +
+  theme_minimal(base_size = 13) +
+  theme(axis.text.x = element_text(angle = 20, hjust = 1))
+```
