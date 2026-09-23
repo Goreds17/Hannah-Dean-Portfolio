@@ -1,0 +1,261 @@
+---
+title: "Project 3 (Two-Way ANOVA)"
+author: "Hannah Dean"
+date: "2025-11-18"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r library}
+library(dplyr)
+library(tidyr)
+library(ez)
+library(lme4)
+library(lmerTest)
+library(ggplot2)
+library(ggpubr)
+library(Hmisc)
+```
+
+## Study Design & Data Prep
+#### Research Question, Factors, & Dependent Variable
+
+Research Question: How does hitter handiness (RHH vs LHH) and pitch spin rate tiers (low, med, high) influence exit velocity?
+
+Factors:
+- Factor A: RHH vs. LHH
+  - Between-Subjects: Hitters cant change handiness for switch hitters I created a new variable "batter_hand" so that switch hitters who bat both dont get combined into the same batter id.
+- Factor: Spin Rate Tier (Low, Med, High)
+  - Within-Subjects: Therefore each batter encounters all three spin rate tiers in the study
+
+Dependent Variable: Exit Velocity
+
+#### Data simulated/imported
+
+```{r Data importing}
+all_inplay_clean <- read.csv("all_inplay_clean.csv")
+```
+
+The data set has all balls in play in the 2025 Pioneer Baseball league with the added variable spin rate tier based on average spin rate quantile cutoffs.
+
+#### Mathematical models
+
+Traditional Two-Way ANOVA Model:
+
+$$EV_{ij k} = \mu + \alpha_i + \beta_j + (\alpha\beta)_{ij} + \varepsilon_{ijk}$$
+
+$$\begin{aligned}
+\mu &= \text{overall mean exit velocity} \\
+\alpha_i &= \text{effect of handedness level } i \; (i = \text{RHH, LHH}) \\
+\beta_j &= \text{effect of spin--rate tier } j \; (j = \text{Low, Medium, High}) \\
+(\alpha\beta)_{ij} &= \text{interaction between handedness and spin tier} \\
+\varepsilon_{ijk} &= \text{random error for batter } k \text{ in condition } ij
+\end{aligned}$$
+
+Repeated Two-Way ANOVA Model:
+
+$$EV_{ijk} = \mu + \alpha_i + \beta_j + (\alpha\beta)_{ij} + S_k + (S\beta)_{jk} + \varepsilon_{ijk}$$
+$$\begin{aligned}
+EV_{ijk} &= \text{exit velocity for spin tier } i,\ \text{second within-subject factor } j,\ \text{and batter } k \\
+\mu &= \text{overall mean exit velocity} \\
+\alpha_i &= \text{effect of spin-rate tier } i\ (\text{Low, Medium, High}) \\
+\beta_j &= \text{effect of the second within-subject factor } j \\
+(\alpha\beta)_{ij} &= \text{interaction between the two within-subject factors} \\
+S_k &= \text{random effect of batter } k \\
+(S\beta)_{jk} &= \text{subject-by-spin-tier interaction, capturing the variability in how batter } k \text{ responds to spin-tier level } j
+\varepsilon_{ijk} &= \text{residual error}
+\end{aligned}$$
+
+
+## Trditional Two-Way ANOVA
+
+```{r data set for traditional anova}
+## Remove NA's ##
+df_clean <- all_inplay_clean %>%
+  filter(
+    !is.na(exit_speed),
+    !is.na(spin_tier),
+    !is.na(handedness),
+    !is.na(batter)
+  )
+
+## Aggregate ##
+df_agg <- df_clean %>%
+  group_by(batter, handedness, spin_tier) %>%
+  summarise(
+    mean_ev = mean(exit_speed, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+## ID Batter Handiness ##
+df_agg <- df_agg %>%
+  mutate(
+    batter_hand = paste0(batter, " (", handedness, ")")
+  )
+
+
+## Factor ##
+
+df_agg <- df_agg %>%
+  mutate(
+    batter     = factor(batter),
+    handedness = factor(handedness),
+    spin_tier  = factor(spin_tier,
+                        levels = c("Low", "Medium", "High"))
+  ) %>%
+  droplevels()
+
+```
+
+#### Model fitting and output 
+
+```{r traditional two-way anova}
+trad_anova <- lm(mean_ev ~ handedness * spin_tier, data = df_agg)
+
+anova(trad_anova)
+summary(trad_anova)
+```
+#### Main effects and interaction
+
+Right-handed hitters produce, 1.76 mph higher exit velocity than left-handed hitters when facing Low-spin pitches. RHH tend to hit the ball slightly harder.
+
+Do to the significance of the high spin tier we can conclude that exit velocity increases as spin rate increases, with Medium and High spin pitches producing slightly higher exit velocities than Low spin pitches for LHH.
+
+Do to the negative RHHxMedium and RHHxLow we can state RHH benefit less from higher spin tiers than LHH do. For High-spin pitches, RHH show a 3.29 mph smaller increase in exit velocity than LHH.
+
+LHH gain more exit velocity from higher-spin pitches than RHH, indicating that the effect of spin tier depends on hitter handedness.
+
+#### Significance and effect
+
+Effect of Handiness:
+  - Not significant (F(1,1555) = 0.18, p = 0.673)
+  - This means right- and left-handed hitters do not differ significantly in exit velocity
+  - While RHH had a slightly higher mean EV (+1.76 mph), this difference is not statistically reliable.
+
+Effect of Spin Tier:
+  - Not significant (F(2,1555) = 0.71, p = 0.491)
+  - Although Medium and High spin tiers show slightly higher exit velocities, spin rate tier alone is not a significant predictor of exit velocity when averaging over handiness.
+  - Spin rate does not have a statistically significant effect on mean exit velocity
+  
+Interaction Effect: Handiness x Spin Tier:
+  - Significant (F(2,1555) = 3.05, p = 0.0479
+  - The effect of spin rate on exit velocity depends on hitter handedness.
+  - Left-handed hitters and right-handed hitters respond differently to changes in spin tier.
+    - LHH gain more exit velocity as spin increases
+    - RHH gain less (especially in the High spin tier, where they drop ~3.3 mph compared to LHH)
+  
+## Repeated Two-Way ANOVA
+
+```{r Data set for repeated anova}
+valid_subjects <- df_agg %>%
+  group_by(batter_hand) %>%
+  summarise(n_tiers = n_distinct(spin_tier)) %>%
+  filter(n_tiers == 3) %>%
+  pull(batter_hand)
+
+df_agg_complete <- df_agg %>%
+  filter(batter_hand %in% valid_subjects) %>%
+  droplevels()
+```
+#### ezANOVA()
+
+```{r repeated two-way anova}
+anova_rm <- ezANOVA(
+  data = df_agg_complete,
+  dv = mean_ev,
+  wid = batter_hand,
+  within = .(spin_tier),
+  between = .(handedness),
+  type = 3,
+  detailed = TRUE
+)
+anova_rm
+```
+
+#### lmer() and random effects
+
+```{r lmer() and random effects}
+model_lmer <- lmer(
+  mean_ev ~ handedness * spin_tier + (1 | batter_hand),
+  data = df_agg_complete
+)
+
+summary(model_lmer)
+```
+
+#### Comparison between traditional and repeated models
+####  Summary
+
+## Visualization
+#### Boxplot and interaction plot
+
+```{r boxplot}
+ggplot(df_agg_complete,
+       aes(x = spin_tier,
+           y = mean_ev,
+           fill = handedness)) +
+  
+  geom_boxplot(position = position_dodge(width = 0.8)) +
+  
+  scale_fill_brewer(palette = "Pastel1") +
+  
+  stat_compare_means(
+    aes(group = handedness),
+    method = "t.test",
+    label = "p.format",   # prints p = 0.02 style labels
+    hide.ns = TRUE        # hides "ns" labels
+  ) +
+  
+  labs(
+    title = "Boxplot: Handedness × Spin Tier with p-values",
+    x = "Spin Tier",
+    y = "Mean Exit Velocity (mph)",
+    fill = "Handedness"
+  ) +
+  
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5)
+  )
+```
+
+```{r interaction plot}
+ggplot(df_agg_complete,
+       aes(x = spin_tier,
+           y = mean_ev,
+           group = handedness,
+           color = handedness)) +
+  
+  stat_summary(fun = mean, geom = "line", linewidth = 1.2) +
+  stat_summary(fun = mean, geom = "point", size = 3) +
+  
+  stat_summary(fun.data = mean_cl_normal, geom = "errorbar", width = 0.1) +
+  
+  labs(
+    title = "Interaction Plot: Handedness × Spin Tier",
+    x = "Spin Tier",
+    y = "Mean Exit Velocity (mph)",
+    color = "Handedness"
+  ) +
+  
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    legend.position = "right"
+  )
+```
+
+#### Significance annotation
+
+```{r significance plot}
+ggboxplot(df_agg_complete,
+          x = "spin_tier",
+          y = "mean_ev",
+          color = "handedness",
+          palette = "jco",
+          add = "jitter",
+          title = "Exit Velocity by Spin Tier and Handedness") +
+  stat_compare_means(aes(group = handedness), 
+                     label = "p.signif")   # adds ***/**/* for each tier
+```
