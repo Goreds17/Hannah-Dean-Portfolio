@@ -50,6 +50,21 @@ The application was designed to bridge the gap between statistical analysis and 
 
 ---
 
+### NLP in Scouting Reports
+**Natural Language Processing | Machine Learning | Player Evaluation**
+
+A natural language processing and machine learning project designed to analyze baseball scouting reports and predict player risk levels and future value grades from unstructured scouting text.
+
+The project transforms written scouting evaluations into quantitative features using text preprocessing and TF-IDF, then applies classification models to identify patterns in scouting language associated with player risk and projected future value.
+
+This project explores how traditional qualitative scouting information can be incorporated into data-driven player evaluation while preserving information contained in written scouting reports.
+
+**Tools:** Python, NLP, Pandas, NLTK, TF-IDF, Machine Learning, Classification
+
+[View Project](./NLP-Scouting-Reports/)
+
+---
+
 ### Pitch Outcome Modeling
 **Predictive Analytics | Machine Learning**
 
